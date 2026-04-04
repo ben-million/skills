@@ -76,6 +76,10 @@ Each `write_html` call produces ONE visual group. Insert in order — `insert-ch
 
 Sequence: set outer frame to flex first, then insert container shell, then insert each row into the card in top-to-bottom order.
 
+**`x-paper-clone` creates COPIES, not moves.** The original nodes remain as direct children of their parent. After building all flex containers with clones, you MUST delete every original node that was cloned. Check with `get_children` on the parent to find remaining originals.
+
+**SVG clones from reference artboards may contain ghost text nodes** (empty `" "` Text nodes inside the SVG). After cloning, call `get_tree_summary` on the cloned SVG and delete any Text children with empty/whitespace content — they can render as visible artifacts.
+
 ### 7. Screenshot and compare
 
 Call `get_screenshot` after building. Compare against the original screenshot from step 1.
@@ -89,21 +93,47 @@ Call `get_screenshot` after building. Compare against the original screenshot fr
 | "This image node is simple, I'll recreate it" | No. Image nodes have `backgroundImage` URLs that are unique to the file. Clone. |
 | "I'll fix the insertion order later" | No. Plan order before inserting. Rebuilding containers wastes time. |
 | "I'll apply grayscale to the flex container" | No. CSS `filter` is inherited. Apply to individual leaf elements only. |
+| "I'll simulate the back card with box-shadow" | No. Box-shadow produces subtly wrong colors and rendering. Use a real Rectangle element. |
 
 ## Rules for Layered Card Effects
 
-The only valid use of `position: absolute` in the output is for decorative back-cards that create a layered shadow effect. Structure:
+The only valid use of `position: absolute` in the output is for decorative back-cards that create a layered shadow effect.
+
+### Card stack wrapper — NO flex, use fixed dimensions
+
+**CRITICAL:** The card stack wrapper must NOT use `display: flex`. Flex wrappers collapse to 0×0 in Paper when their children use absolute/relative positioning. Use a plain frame with explicit `width` and `height` matching the front card dimensions.
 
 ```html
-<div style="display: flex; position: relative;">
-  <!-- Back card: absolute, offset from front -->
-  <div style="position: absolute; top: 0; left: 0; ...shadow styles..."></div>
-  <!-- Front card: relative with offset, flex column for content -->
-  <div style="position: relative; top: 12px; left: 12px; display: flex; flex-direction: column; ...">
+<!-- CORRECT — fixed-size wrapper, no flex -->
+<div style="position: relative; width: 274px; height: 184px;">
+  <!-- Back card FIRST (renders behind in Paper's z-order) -->
+  <div style="position: absolute; top: -12px; left: -12px; width: 252px; height: 187px; border-radius: 16px; background-color: #FCFCFC; box-shadow: #B0B0B038 0px 0px 0px 0.5px;"></div>
+  <!-- Front card SECOND (renders on top), flex column for content -->
+  <div style="position: relative; display: flex; flex-direction: column; width: 274px; height: 184px; ...">
     ...content rows...
   </div>
 </div>
 ```
+
+```html
+<!-- WRONG — flex wrapper collapses to 0×0 -->
+<div style="display: flex; position: relative;">
+  ...
+</div>
+
+<!-- WRONG — back card inside front card as child (overlaps content) -->
+<div style="display: flex; flex-direction: column; ...front card styles...">
+  <div style="position: absolute; top: -12px; left: -12px; ...back card..."></div>
+  ...content rows...
+</div>
+
+<!-- WRONG — simulating back card with box-shadow (wrong colors/rendering) -->
+<div style="box-shadow: ..., #FCFCFC -12px -12px 0px 0px;">
+```
+
+### Why child order matters
+
+Paper renders later children on top of earlier children (like Figma/Sketch). The back card MUST be the first child so it renders behind the front card. Always verify with `get_children` after building.
 
 ## Before marking complete, you MUST:
 
