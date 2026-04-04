@@ -1,5 +1,5 @@
 ---
-name: paper-flex-conversion
+name: flex-conversion
 description: Use when converting Paper design nodes from absolute positioning to flex containers. Covers restructuring layouts, preserving SVGs/images, cloning nodes, and computing flex gaps from absolute coordinates.
 ---
 
