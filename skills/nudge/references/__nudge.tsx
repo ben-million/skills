@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { Calligraph } from "calligraph";
 
 export interface NudgeConfig {
   property: string;
@@ -240,12 +241,14 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const [dismissed, setDismissed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
+  const [isNudging, setIsNudging] = useState(false);
 
   const savedValueRef = useRef("");
   const numericRef = useRef(0);
   const unitRef = useRef("");
   const optionIndexRef = useRef(0);
   const currentValueRef = useRef("");
+  const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     setMounted(true);
@@ -442,10 +445,16 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
         e.preventDefault();
         stepValue(1, e.shiftKey);
         setActiveKey("up");
+        setIsNudging(true);
+        clearTimeout(nudgeTimeoutRef.current);
+        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 1500);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         stepValue(-1, e.shiftKey);
         setActiveKey("down");
+        setIsNudging(true);
+        clearTimeout(nudgeTimeoutRef.current);
+        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 1500);
       }
     }
 
@@ -460,6 +469,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
+      clearTimeout(nudgeTimeoutRef.current);
     };
   }, [config, targetEl, dismissed, applyPreview, dismiss]);
 
@@ -473,10 +483,10 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   return createPortal(
     <>
       <Bar
-        property={config.property}
         value={currentValue}
         activeKey={activeKey}
         isColor={config.type === "color"}
+        expanded={isNudging}
       />
       {toastMsg && <Toast message={toastMsg} />}
     </>,
@@ -519,54 +529,58 @@ function Arrow({ active, down }: { active: boolean; down?: boolean }) {
 }
 
 function Bar({
-  property,
   value,
   activeKey,
   isColor,
+  expanded,
 }: {
-  property: string;
   value: string;
   activeKey: "up" | "down" | null;
   isColor: boolean;
+  expanded: boolean;
 }) {
-  const label = property.charAt(0).toUpperCase() + property.slice(1);
+  const expandTransition =
+    "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
+    "margin-right 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
+    "opacity 0.35s ease 0.1s";
+
+  const collapseTransition =
+    "max-width 0.45s cubic-bezier(0.32, 0.72, 0, 1), " +
+    "margin-right 0.45s cubic-bezier(0.32, 0.72, 0, 1), " +
+    "opacity 0.15s ease";
 
   return (
     <div
       style={{
         position: "fixed",
-        bottom: 20,
+        bottom: expanded ? 20 : 12,
         left: "50%",
-        transform: "translateX(-50%)",
+        transform: `translateX(-50%) scale(${expanded ? 1 : 0.85})`,
         zIndex: 2147483647,
         display: "flex",
         height: 37,
         alignItems: "center",
-        justifyContent: "space-between",
         borderRadius: 9999,
         padding: "0 16px",
         background: "#161616",
         fontSynthesis: "none",
         WebkitFontSmoothing: "antialiased",
-        gap: 16,
         pointerEvents: "auto",
         userSelect: "none",
+        transition: "transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
-      {isColor ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
-            style={{
-              color: "#fff",
-              fontFamily: FONT,
-              fontWeight: 500,
-              fontSize: 15.5,
-              lineHeight: "23px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {label}
-          </span>
+      <div
+        style={{
+          maxWidth: expanded ? 100 : 0,
+          marginRight: expanded ? 1 : 0,
+          opacity: expanded ? 1 : 0,
+          transition: expanded ? expandTransition : collapseTransition,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {isColor ? (
           <div
             style={{
               width: 15,
@@ -578,36 +592,26 @@ function Bar({
               flexShrink: 0,
             }}
           />
-        </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-          <span
+        ) : (
+          <Calligraph
+            variant="slots"
+            animation="snappy"
             style={{
               color: "#fff",
               fontFamily: FONT,
               fontWeight: 500,
-              fontSize: 15.5,
-              lineHeight: "23px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {label}
-          </span>
-          <span
-            style={{
-              color: "color(display-p3 0.566 0.566 0.566)",
-              fontFamily: FONT,
-              fontWeight: 500,
-              fontSize: 15.5,
-              lineHeight: "23px",
+              fontSize: 14.5,
+              lineHeight: "22px",
               whiteSpace: "nowrap",
               fontVariantNumeric: "tabular-nums",
+              minWidth: 48,
+              textAlign: "left",
             }}
           >
             {value}
-          </span>
-        </div>
-      )}
+          </Calligraph>
+        )}
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
         <Arrow down active={activeKey === "down"} />

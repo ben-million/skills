@@ -1,8 +1,14 @@
 # Nudge Installation (Next.js App Router)
 
-Two steps. The component is inert when no config prop is passed — safe to leave permanently.
+Three steps. The component is inert when no config prop is passed — safe to leave permanently.
 
-## 1. Copy the Component
+## 1. Install Dependencies
+
+```bash
+npm install calligraph motion
+```
+
+## 2. Copy the Component
 
 Copy `references/__nudge.tsx` from this skill into the project:
 
@@ -10,7 +16,7 @@ Copy `references/__nudge.tsx` from this skill into the project:
 app/__nudge.tsx
 ```
 
-## 2. Add to Root Layout
+## 3. Add to Root Layout
 
 In `app/layout.tsx`, import and render `<Nudge />` inside `<body>`:
 
