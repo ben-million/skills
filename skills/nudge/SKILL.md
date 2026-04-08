@@ -131,19 +131,10 @@ Use `StrReplace` to update the `<Nudge />` component in `app/layout.tsx`, passin
 }} />
 ```
 
-## Step 5 — Wait for Result
+## Step 5 — Complete
 
-Tell the user: "I've changed X to Y. Use arrow keys to fine-tune, Enter to confirm, Escape to cancel."
+**Your turn is done.** Do NOT open a browser, verify the panel, or wait for the user. Next.js HMR delivers the change.
 
-Then poll the nudge API until the user responds. Run this shell command with `block_until_ms` set to `0`:
+Tell the user: "I've changed X to Y. Use arrow keys on the page to fine-tune it."
 
-```bash
-for i in $(seq 1 600); do r=$(curl -s http://localhost:3000/api/__nudge); echo "$r" | grep -q '"done":true' && echo "$r" && exit 0; sleep 0.5; done
-```
-
-Then use the Await tool on that shell task with `block_until_ms` set to `300000` and pattern `"done":true`.
-
-When the command outputs a JSON object, read the `result` field:
-
-- **`__cancelled__`** — user pressed Escape. Reset `<Nudge />` config and continue.
-- **Anything else** — an edit instruction like `Set padding to 24px in app/page.tsx at line 12`. Apply the edit, then reset `<Nudge />` config.
+The runtime handles submit, cancel, target marker removal, and sessionStorage dismiss. When the user pastes the submitted prompt, it reads as a normal edit instruction — make the edit and reset the config back to `<Nudge />`.

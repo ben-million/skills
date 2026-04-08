@@ -1,6 +1,6 @@
 # Nudge Installation (Next.js App Router)
 
-The component is inert when no config prop is passed — safe to leave permanently.
+Three steps. The component is inert when no config prop is passed — safe to leave permanently.
 
 ## 1. Install Dependencies
 
@@ -8,16 +8,13 @@ The component is inert when no config prop is passed — safe to leave permanent
 npm install calligraph motion
 ```
 
-## 2. Copy Files
+## 2. Copy the Component
 
-Copy these files from this skill's `references/` directory:
+Copy `references/__nudge.tsx` from this skill into the project:
 
-| Source | Destination |
-|---|---|
-| `references/__nudge.tsx` | `app/__nudge.tsx` |
-| `references/__nudge-route.ts` | `app/api/__nudge/route.ts` |
-
-Create the `app/api/__nudge/` directory if it does not exist.
+```
+app/__nudge.tsx
+```
 
 ## 3. Add to Root Layout
 
@@ -37,3 +34,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 ```
+
+That's it. No `public/` files, no `next/script`, no deploy step.
