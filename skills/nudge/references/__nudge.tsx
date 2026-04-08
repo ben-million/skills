@@ -447,14 +447,14 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
         setActiveKey("up");
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 1500);
+        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         stepValue(-1, e.shiftKey);
         setActiveKey("down");
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 1500);
+        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       }
     }
 
@@ -482,6 +482,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
   return createPortal(
     <>
+      <Guidelines target={targetEl} expanded={isNudging} property={config.property} />
       <Bar
         value={currentValue}
         activeKey={activeKey}
@@ -492,6 +493,214 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     </>,
     document.body
   );
+}
+
+// ---------------------------------------------------------------------------
+// Guidelines — property-aware visualization
+// ---------------------------------------------------------------------------
+
+const GUIDE_COLOR = "#3B82F6";
+const GUIDE_FILL = "rgba(59, 130, 246, 0.13)";
+
+function activeSides(property: string) {
+  const p = property;
+  if (
+    !p.includes("-") ||
+    p === "border-radius" ||
+    p === "font-size" ||
+    p === "line-height"
+  )
+    return { top: true, right: true, bottom: true, left: true };
+  if (p.endsWith("-top") || p.endsWith("-block-start"))
+    return { top: true, right: false, bottom: false, left: false };
+  if (p.endsWith("-right") || p.endsWith("-inline-end"))
+    return { top: false, right: true, bottom: false, left: false };
+  if (p.endsWith("-bottom") || p.endsWith("-block-end"))
+    return { top: false, right: false, bottom: true, left: false };
+  if (p.endsWith("-left") || p.endsWith("-inline-start"))
+    return { top: false, right: false, bottom: false, left: true };
+  if (p.includes("-block"))
+    return { top: true, right: false, bottom: true, left: false };
+  if (p.includes("-inline"))
+    return { top: false, right: true, bottom: false, left: true };
+  return { top: true, right: true, bottom: true, left: true };
+}
+
+function Guidelines({
+  target,
+  expanded,
+  property,
+}: {
+  target: Element;
+  expanded: boolean;
+  property: string;
+}) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [cs, setCs] = useState<CSSStyleDeclaration | null>(null);
+
+  useEffect(() => {
+    if (!target) return;
+    const update = () => {
+      setRect(target.getBoundingClientRect());
+      setCs(getComputedStyle(target));
+    };
+    update();
+    if (!expanded) return;
+    const id = setInterval(update, 60);
+    return () => clearInterval(id);
+  }, [target, expanded]);
+
+  if (!rect || !cs) return null;
+
+  const base: React.CSSProperties = {
+    position: "fixed",
+    pointerEvents: "none",
+    zIndex: 2147483646,
+    opacity: expanded ? 1 : 0,
+    transition: expanded ? "opacity 0.25s ease 0.05s" : "opacity 0.2s ease",
+  };
+
+  const outline = null;
+
+  const fill = (
+    l: number,
+    t: number,
+    w: number,
+    h: number,
+    key: string
+  ) =>
+    w > 0 && h > 0 ? (
+      <div key={key} style={{ ...base, left: l, top: t, width: w, height: h, background: GUIDE_FILL }} />
+    ) : null;
+
+  const isPadding = property.startsWith("padding");
+  const isMargin = property.startsWith("margin");
+  const isWidth =
+    property === "width" ||
+    property === "max-width" ||
+    property === "min-width";
+  const isHeight =
+    property === "height" ||
+    property === "max-height" ||
+    property === "min-height";
+  const isGap =
+    property === "gap" ||
+    property === "row-gap" ||
+    property === "column-gap";
+
+  if (isPadding) {
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pr = parseFloat(cs.paddingRight) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    const pl = parseFloat(cs.paddingLeft) || 0;
+    const s = activeSides(property);
+    return (
+      <>
+        {outline}
+        {s.top && fill(rect.left, rect.top, rect.width, pt, "pt")}
+        {s.bottom && fill(rect.left, rect.bottom - pb, rect.width, pb, "pb")}
+        {s.left &&
+          fill(
+            rect.left,
+            rect.top + (s.top ? pt : 0),
+            pl,
+            rect.height - (s.top ? pt : 0) - (s.bottom ? pb : 0),
+            "pl"
+          )}
+        {s.right &&
+          fill(
+            rect.right - pr,
+            rect.top + (s.top ? pt : 0),
+            pr,
+            rect.height - (s.top ? pt : 0) - (s.bottom ? pb : 0),
+            "pr"
+          )}
+      </>
+    );
+  }
+
+  if (isMargin) {
+    const mt = parseFloat(cs.marginTop) || 0;
+    const mr = parseFloat(cs.marginRight) || 0;
+    const mb = parseFloat(cs.marginBottom) || 0;
+    const ml = parseFloat(cs.marginLeft) || 0;
+    const s = activeSides(property);
+    return (
+      <>
+        {outline}
+        {s.top && fill(rect.left, rect.top - mt, rect.width, mt, "mt")}
+        {s.bottom && fill(rect.left, rect.bottom, rect.width, mb, "mb")}
+        {s.left && fill(rect.left - ml, rect.top, ml, rect.height, "ml")}
+        {s.right && fill(rect.right, rect.top, mr, rect.height, "mr")}
+      </>
+    );
+  }
+
+  if (isWidth) {
+    const cy = rect.top + rect.height / 2;
+    return (
+      <>
+        {outline}
+        <div
+          style={{ ...base, left: rect.left, top: cy, width: rect.width, height: 1, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: rect.left, top: cy - 4, width: 1, height: 9, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: rect.right - 1, top: cy - 4, width: 1, height: 9, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+      </>
+    );
+  }
+
+  if (isHeight) {
+    const cx = rect.left + rect.width / 2;
+    return (
+      <>
+        {outline}
+        <div
+          style={{ ...base, left: cx, top: rect.top, width: 1, height: rect.height, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: cx - 4, top: rect.top, width: 9, height: 1, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: cx - 4, top: rect.bottom - 1, width: 9, height: 1, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+      </>
+    );
+  }
+
+  if (isGap) {
+    const children = Array.from(target.children);
+    if (children.length < 2) return outline;
+    const rects = children.map((c) => c.getBoundingClientRect());
+    const dir = cs.flexDirection || "row";
+    const isRow = dir === "row" || dir === "row-reverse";
+    const gaps: React.ReactNode[] = [];
+    for (let i = 0; i < rects.length - 1; i++) {
+      const a = rects[i];
+      const b = rects[i + 1];
+      if (isRow) {
+        const gl = Math.min(a.right, b.right);
+        const gr = Math.max(a.left, b.left);
+        if (gr > gl) gaps.push(fill(gl, rect.top, gr - gl, rect.height, `g${i}`));
+      } else {
+        const gt = Math.min(a.bottom, b.bottom);
+        const gb = Math.max(a.top, b.top);
+        if (gb > gt) gaps.push(fill(rect.left, gt, rect.width, gb - gt, `g${i}`));
+      }
+    }
+    return (
+      <>
+        {outline}
+        {gaps}
+      </>
+    );
+  }
+
+  return outline;
 }
 
 // ---------------------------------------------------------------------------
@@ -515,7 +724,10 @@ function Arrow({ active, down }: { active: boolean; down?: boolean }) {
         width: 19,
         height: "auto",
         flexShrink: 0,
-        ...(down ? { transform: "rotate(180deg)" } : {}),
+        transform: `rotate(${down ? 180 : 0}deg) translateY(${active ? -1.5 : 0}px) scale(${active ? 1.05 : 1})`,
+        transition: active
+          ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.6)"
+          : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
       <path
@@ -523,6 +735,9 @@ function Arrow({ active, down }: { active: boolean; down?: boolean }) {
         clipRule="evenodd"
         d={ARROW_D}
         fill={active ? "#FFFFFF" : "#A7A7A7"}
+        style={{
+          transition: active ? "fill 0.05s ease" : "fill 0.3s ease",
+        }}
       />
     </svg>
   );
@@ -555,7 +770,7 @@ function Bar({
         position: "fixed",
         bottom: expanded ? 20 : 12,
         left: "50%",
-        transform: `translateX(-50%) scale(${expanded ? 1 : 0.85})`,
+        transform: `translateX(-50%) translateY(${activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0}px) scale(${expanded ? 1 : 0.85})`,
         zIndex: 2147483647,
         display: "flex",
         height: 37,
@@ -567,7 +782,9 @@ function Bar({
         WebkitFontSmoothing: "antialiased",
         pointerEvents: "auto",
         userSelect: "none",
-        transition: "transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1)",
+        transition: activeKey
+          ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1)"
+          : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
       <div
