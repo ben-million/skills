@@ -249,6 +249,12 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
   useEffect(() => {
     setMounted(true);
+    if (!document.querySelector('link[href*="open-runde"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://fonts.cdnfonts.com/css/open-runde";
+      document.head.appendChild(link);
+    }
   }, []);
 
   // Reset state when config changes
@@ -470,6 +476,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
         property={config.property}
         value={currentValue}
         activeKey={activeKey}
+        isColor={config.type === "color"}
       />
       {toastMsg && <Toast message={toastMsg} />}
     </>,
@@ -481,134 +488,156 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 // Bar UI
 // ---------------------------------------------------------------------------
 
+const FONT = "'Open Runde', system-ui, sans-serif";
+
+const ARROW_D =
+  "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
+
+function Arrow({ active, down }: { active: boolean; down?: boolean }) {
+  return (
+    <svg
+      width="1em"
+      height="1em"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{
+        width: 19,
+        height: "auto",
+        flexShrink: 0,
+        ...(down ? { transform: "rotate(180deg)" } : {}),
+      }}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d={ARROW_D}
+        fill={active ? "#FFFFFF" : "#A7A7A7"}
+      />
+    </svg>
+  );
+}
+
 function Bar({
   property,
   value,
   activeKey,
+  isColor,
 }: {
   property: string;
   value: string;
   activeKey: "up" | "down" | null;
+  isColor: boolean;
 }) {
+  const label = property.charAt(0).toUpperCase() + property.slice(1);
+
   return (
-    <div style={styles.bar}>
-      <span style={styles.label}>{property}</span>
-      <span style={styles.val}>{value}</span>
-      <span style={styles.keys}>
-        <span
-          style={{
-            ...styles.kbd,
-            ...(activeKey === "down" ? styles.kbdActive : {}),
-          }}
-        >
-          ↓
-        </span>
-        <span
-          style={{
-            ...styles.kbd,
-            ...(activeKey === "up" ? styles.kbdActive : {}),
-          }}
-        >
-          ↑
-        </span>
-      </span>
-      <span style={styles.hints}>esc · enter</span>
+    <div
+      style={{
+        position: "fixed",
+        bottom: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 2147483647,
+        display: "flex",
+        height: 37,
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderRadius: 9999,
+        padding: "0 16px",
+        background: "#161616",
+        fontSynthesis: "none",
+        WebkitFontSmoothing: "antialiased",
+        gap: 16,
+        pointerEvents: "auto",
+        userSelect: "none",
+      }}
+    >
+      {isColor ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              color: "#fff",
+              fontFamily: FONT,
+              fontWeight: 500,
+              fontSize: 15.5,
+              lineHeight: "23px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {label}
+          </span>
+          <div
+            style={{
+              width: 15,
+              height: 15,
+              borderRadius: "50%",
+              background: value,
+              border: "2px solid #161616",
+              outline: `2px solid ${value}`,
+              flexShrink: 0,
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+          <span
+            style={{
+              color: "#fff",
+              fontFamily: FONT,
+              fontWeight: 500,
+              fontSize: 15.5,
+              lineHeight: "23px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {label}
+          </span>
+          <span
+            style={{
+              color: "color(display-p3 0.566 0.566 0.566)",
+              fontFamily: FONT,
+              fontWeight: 500,
+              fontSize: 15.5,
+              lineHeight: "23px",
+              whiteSpace: "nowrap",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {value}
+          </span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <Arrow down active={activeKey === "down"} />
+        <Arrow active={activeKey === "up"} />
+      </div>
     </div>
   );
 }
 
 function Toast({ message }: { message: string }) {
-  return <div style={styles.toast}>{message}</div>;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 68,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#161616",
+        color: "#fff",
+        padding: "6px 14px",
+        borderRadius: 9999,
+        fontSize: 13,
+        fontFamily: FONT,
+        fontWeight: 500,
+        zIndex: 2147483647,
+        pointerEvents: "none",
+        WebkitFontSmoothing: "antialiased",
+      }}
+    >
+      {message}
+    </div>
+  );
 }
-
-// ---------------------------------------------------------------------------
-// Inline styles (no external CSS needed)
-// ---------------------------------------------------------------------------
-
-const styles: Record<string, React.CSSProperties> = {
-  bar: {
-    position: "fixed",
-    bottom: 20,
-    left: "50%",
-    transform: "translateX(-50%)",
-    zIndex: 2147483647,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    fontSize: 13,
-    lineHeight: 1,
-    color: "#1a1a1a",
-    background: "#fff",
-    border: "1px solid #e0e0e0",
-    borderRadius: 10,
-    boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
-    padding: "7px 12px",
-    pointerEvents: "auto",
-    userSelect: "none",
-  },
-  label: {
-    fontWeight: 600,
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    color: "#999",
-  },
-  val: {
-    fontWeight: 600,
-    fontVariantNumeric: "tabular-nums",
-    minWidth: 32,
-  },
-  keys: {
-    display: "flex",
-    alignItems: "center",
-    gap: 3,
-  },
-  kbd: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 24,
-    height: 24,
-    border: "1px solid #d0d0d0",
-    borderBottomWidth: 2,
-    borderRadius: 5,
-    background: "#f8f8f8",
-    fontSize: 12,
-    color: "#666",
-    pointerEvents: "none",
-    transition: "all 0.06s ease",
-  },
-  kbdActive: {
-    background: "#e0e0e0",
-    borderBottomWidth: 1,
-    borderColor: "#bbb",
-    color: "#333",
-    transform: "translateY(1px)",
-  },
-  hints: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: 2,
-    fontSize: 10,
-    color: "#c0c0c0",
-    letterSpacing: "0.02em",
-  },
-  toast: {
-    position: "fixed",
-    bottom: 64,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "#333",
-    color: "#fff",
-    padding: "6px 12px",
-    borderRadius: 6,
-    fontSize: 12,
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    zIndex: 2147483647,
-    pointerEvents: "none",
-  },
-};
