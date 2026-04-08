@@ -244,6 +244,9 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const [barVisible, setBarVisible] = useState(false);
   const [barMounted, setBarMounted] = useState(false);
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const lastIsColorRef = useRef(false);
+
+  if (config) lastIsColorRef.current = config.type === "color";
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
 
@@ -323,7 +326,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     clearTimeout(exitTimeoutRef.current);
     if (shouldShow) {
       setBarMounted(true);
-      requestAnimationFrame(() => requestAnimationFrame(() => setBarVisible(true)));
+      exitTimeoutRef.current = setTimeout(() => setBarVisible(true), 30);
     } else {
       setBarVisible(false);
       exitTimeoutRef.current = setTimeout(() => setBarMounted(false), 400);
@@ -534,11 +537,11 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
   return createPortal(
     <>
-      {barMounted && config && targetEl && (
+      {barMounted && (
         <Bar
           value={currentValue}
           activeKey={activeKey}
-          isColor={config.type === "color"}
+          isColor={lastIsColorRef.current}
           expanded={isNudging}
           onNudge={triggerNudge}
           confirmed={confirmed}
