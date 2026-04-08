@@ -389,6 +389,9 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
         parts.push("in `" + config!.file + "`");
         if (config!.line) parts.push("at line " + config!.line);
       }
+      parts.push(
+        "— also apply this change to any related or sibling elements/components nearby that share the same style, where it makes logical sense to keep them consistent"
+      );
       return parts.join(" ");
     }
 
