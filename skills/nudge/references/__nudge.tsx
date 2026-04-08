@@ -449,7 +449,13 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     }
 
     function handleSubmit() {
-      copyToClipboard(buildPrompt());
+      const prompt = buildPrompt();
+      fetch("/api/__nudge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ result: prompt }),
+      });
+      copyToClipboard(prompt);
       setConfirmed(true);
       setIsNudging(true);
       clearTimeout(nudgeTimeoutRef.current);
@@ -460,6 +466,11 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     }
 
     function handleCancel() {
+      fetch("/api/__nudge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ result: "__cancelled__" }),
+      });
       const useSvg = isSvgAttr(targetEl!, config!.property);
       if (useSvg) {
         if (savedValueRef.current) {
