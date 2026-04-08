@@ -17,19 +17,8 @@ export interface NudgeConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Color helpers
+// Color helpers — format-preserving lightness stepping
 // ---------------------------------------------------------------------------
-
-function parseColor(css: string): { r: number; g: number; b: number } | null {
-  const el = document.createElement("div");
-  el.style.color = css;
-  document.body.appendChild(el);
-  const computed = getComputedStyle(el).color;
-  el.remove();
-  const m = computed.match(/(\d+)/g);
-  if (!m || m.length < 3) return null;
-  return { r: +m[0], g: +m[1], b: +m[2] };
-}
 
 function rgbToHSL(r: number, g: number, b: number) {
   r /= 255;
@@ -55,14 +44,10 @@ function pad(n: number) {
   return s.length < 2 ? "0" + s : s;
 }
 
-function hslToHex(h: number, s: number, l: number) {
+function hslToRGB(h: number, s: number, l: number) {
   h /= 360;
   s /= 100;
   l /= 100;
-  if (s === 0) {
-    const v = Math.round(l * 255);
-    return "#" + pad(v) + pad(v) + pad(v);
-  }
   function hue2rgb(p: number, q: number, t: number) {
     if (t < 0) t += 1;
     if (t > 1) t -= 1;
@@ -71,13 +56,113 @@ function hslToHex(h: number, s: number, l: number) {
     if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
     return p;
   }
+  if (s === 0) return { r: l, g: l, b: l };
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
+  return {
+    r: hue2rgb(p, q, h + 1 / 3),
+    g: hue2rgb(p, q, h),
+    b: hue2rgb(p, q, h - 1 / 3),
+  };
+}
+
+/**
+ * Detects the CSS color format of `css`, adjusts lightness by `direction * 2%`,
+ * and returns the result in the **same format**. Handles hex, rgb(), hsl(),
+ * color(display-p3 ...), and oklch(). Falls back to browser resolution for
+ * named colors or unknown formats, outputting hex.
+ */
+function stepColor(css: string, direction: number): string | null {
+  const STEP = direction * 2;
+
+  // --- hex (#rgb, #rrggbb, #rrggbbaa) ---
+  if (/^#[0-9a-f]{3,8}$/i.test(css)) {
+    let hex = css;
+    if (hex.length === 4)
+      hex = "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const hsl = rgbToHSL(r, g, b);
+    hsl.l = clamp(hsl.l + STEP, 0, 100);
+    const out = hslToRGB(hsl.h, hsl.s, hsl.l);
+    return (
+      "#" +
+      pad(Math.round(out.r * 255)) +
+      pad(Math.round(out.g * 255)) +
+      pad(Math.round(out.b * 255))
+    );
+  }
+
+  // --- color(display-p3 r g b) — values 0-1 ---
+  const p3 = css.match(
+    /color\(\s*display-p3\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/
+  );
+  if (p3) {
+    const hsl = rgbToHSL(+p3[1] * 255, +p3[2] * 255, +p3[3] * 255);
+    hsl.l = clamp(hsl.l + STEP, 0, 100);
+    const out = hslToRGB(hsl.h, hsl.s, hsl.l);
+    return `color(display-p3 ${out.r.toFixed(4)} ${out.g.toFixed(4)} ${out.b.toFixed(4)})`;
+  }
+
+  // --- oklch(L C H) — L is 0-1 or 0%-100% ---
+  const ok = css.match(
+    /oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)\s*\)/
+  );
+  if (ok) {
+    const pct = ok[1].endsWith("%");
+    let l = parseFloat(ok[1]);
+    if (pct) {
+      l = clamp(l + STEP, 0, 100);
+      return `oklch(${l.toFixed(2)}% ${ok[2]} ${ok[3]})`;
+    }
+    l = clamp(l + direction * 0.02, 0, 1);
+    return `oklch(${l.toFixed(4)} ${ok[2]} ${ok[3]})`;
+  }
+
+  // --- rgb(r, g, b) / rgba(r, g, b, a) ---
+  const rgb = css.match(
+    /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/
+  );
+  if (rgb) {
+    const hsl = rgbToHSL(+rgb[1], +rgb[2], +rgb[3]);
+    hsl.l = clamp(hsl.l + STEP, 0, 100);
+    const out = hslToRGB(hsl.h, hsl.s, hsl.l);
+    return (
+      "#" +
+      pad(Math.round(out.r * 255)) +
+      pad(Math.round(out.g * 255)) +
+      pad(Math.round(out.b * 255))
+    );
+  }
+
+  // --- hsl(h, s%, l%) ---
+  const hsl = css.match(
+    /hsla?\(\s*([\d.]+)[,\s]+([\d.]+)%?[,\s]+([\d.]+)%?/
+  );
+  if (hsl) {
+    const l = clamp(+hsl[3] + STEP, 0, 100);
+    return `hsl(${hsl[1]}, ${hsl[2]}%, ${l}%)`;
+  }
+
+  // --- Fallback: resolve through browser, output hex ---
+  const el = document.createElement("div");
+  el.style.color = css;
+  document.body.appendChild(el);
+  const computed = getComputedStyle(el).color;
+  el.remove();
+  const m = computed.match(
+    /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/
+  );
+  if (!m) return null;
+  const fhsl = rgbToHSL(+m[1], +m[2], +m[3]);
+  fhsl.l = clamp(fhsl.l + STEP, 0, 100);
+  const fout = hslToRGB(fhsl.h, fhsl.s, fhsl.l);
   return (
     "#" +
-    pad(Math.round(hue2rgb(p, q, h + 1 / 3) * 255)) +
-    pad(Math.round(hue2rgb(p, q, h) * 255)) +
-    pad(Math.round(hue2rgb(p, q, h - 1 / 3) * 255))
+    pad(Math.round(fout.r * 255)) +
+    pad(Math.round(fout.g * 255)) +
+    pad(Math.round(fout.b * 255))
   );
 }
 
@@ -277,11 +362,9 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
         );
         next = String(config!.options![optionIndexRef.current]);
       } else if (isColor) {
-        const rgb = parseColor(currentValueRef.current);
-        if (!rgb) return;
-        const hsl = rgbToHSL(rgb.r, rgb.g, rgb.b);
-        hsl.l = clamp(hsl.l + direction * 2, 0, 100);
-        next = hslToHex(hsl.h, hsl.s, hsl.l);
+        const stepped = stepColor(currentValueRef.current, direction);
+        if (!stepped) return;
+        next = stepped;
       } else {
         const s = step >= 1 ? 1 : step;
         const mult = shift ? 10 : 1;
