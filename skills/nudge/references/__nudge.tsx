@@ -797,19 +797,7 @@ function Bar({
           alignItems: "center",
         }}
       >
-        {isColor ? (
-          <div
-            style={{
-              width: 15,
-              height: 15,
-              borderRadius: "50%",
-              background: value,
-              border: "2px solid #161616",
-              outline: `2px solid ${value}`,
-              flexShrink: 0,
-            }}
-          />
-        ) : (
+        {isColor ? null : (
           <Calligraph
             variant="slots"
             animation="snappy"
