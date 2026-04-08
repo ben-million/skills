@@ -240,6 +240,10 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const [currentValue, setCurrentValue] = useState("");
   const [dismissed, setDismissed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [barVisible, setBarVisible] = useState(false);
+  const [barMounted, setBarMounted] = useState(false);
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
 
@@ -249,6 +253,20 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const optionIndexRef = useRef(0);
   const currentValueRef = useRef("");
   const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const stepValueRef = useRef<(direction: number, shift: boolean) => void>();
+
+  const triggerNudge = useCallback(
+    (dir: "up" | "down") => {
+      const direction = dir === "up" ? 1 : -1;
+      stepValueRef.current?.(direction, false);
+      setActiveKey(dir);
+      setIsNudging(true);
+      clearTimeout(nudgeTimeoutRef.current);
+      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+      setTimeout(() => setActiveKey(null), 100);
+    },
+    []
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -293,6 +311,25 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
       numericRef.current = parseFloat(config.value) || 0;
     }
   }, [config]);
+
+  useEffect(() => {
+    if (isNudging && targetEl) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isNudging, targetEl]);
+
+  const shouldShow = mounted && !!config && !!targetEl && !dismissed;
+  useEffect(() => {
+    clearTimeout(exitTimeoutRef.current);
+    if (shouldShow) {
+      setBarMounted(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setBarVisible(true)));
+    } else {
+      setBarVisible(false);
+      exitTimeoutRef.current = setTimeout(() => setBarMounted(false), 400);
+    }
+    return () => clearTimeout(exitTimeoutRef.current);
+  }, [shouldShow]);
 
   // Find target element
   useEffect(() => {
@@ -392,6 +429,8 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
       setCurrentValue(next);
     }
 
+    stepValueRef.current = stepValue;
+
     function buildPrompt() {
       const parts = [
         "Set `" + config!.property + "` to `" + currentValueRef.current + "`",
@@ -408,9 +447,13 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
     function handleSubmit() {
       copyToClipboard(buildPrompt());
-      setToastMsg("Copied to clipboard");
-      setTimeout(() => setToastMsg(null), 1800);
-      dismiss();
+      setConfirmed(true);
+      setIsNudging(true);
+      clearTimeout(nudgeTimeoutRef.current);
+      nudgeTimeoutRef.current = setTimeout(() => {
+        setConfirmed(false);
+        dismiss();
+      }, 800);
     }
 
     function handleCancel() {
@@ -435,7 +478,21 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        const orig = config!.original;
+        applyPreview(targetEl!, orig);
+        currentValueRef.current = orig;
+        setCurrentValue(orig);
+        const match = String(orig).match(/([\d.]+)\s*(.*)/);
+        if (match) {
+          numericRef.current = parseFloat(orig) || 0;
+          unitRef.current = match[2];
+        }
+        setIsNudging(true);
+        clearTimeout(nudgeTimeoutRef.current);
+        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+      } else if (e.key === "Escape") {
         e.preventDefault();
         handleCancel();
       } else if (e.key === "Enter") {
@@ -473,22 +530,21 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     };
   }, [config, targetEl, dismissed, applyPreview, dismiss]);
 
-  if (!mounted || !config || !targetEl || dismissed) {
-    if (mounted && toastMsg) {
-      return createPortal(<Toast message={toastMsg} />, document.body);
-    }
-    return null;
-  }
+  if (!barMounted && !(mounted && toastMsg)) return null;
 
   return createPortal(
     <>
-      <Guidelines target={targetEl} expanded={isNudging} property={config.property} />
-      <Bar
-        value={currentValue}
-        activeKey={activeKey}
-        isColor={config.type === "color"}
-        expanded={isNudging}
-      />
+      {barMounted && config && targetEl && (
+        <Bar
+          value={currentValue}
+          activeKey={activeKey}
+          isColor={config.type === "color"}
+          expanded={isNudging}
+          onNudge={triggerNudge}
+          confirmed={confirmed}
+          visible={barVisible}
+        />
+      )}
       {toastMsg && <Toast message={toastMsg} />}
     </>,
     document.body
@@ -712,7 +768,15 @@ const FONT = "'Open Runde', system-ui, sans-serif";
 const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
 
-function Arrow({ active, down }: { active: boolean; down?: boolean }) {
+function Arrow({
+  active,
+  down,
+  onClick,
+}: {
+  active: boolean;
+  down?: boolean;
+  onClick?: () => void;
+}) {
   return (
     <svg
       width="1em"
@@ -720,10 +784,12 @@ function Arrow({ active, down }: { active: boolean; down?: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      onClick={onClick}
       style={{
         width: 19,
         height: "auto",
         flexShrink: 0,
+        cursor: "pointer",
         transform: `rotate(${down ? 180 : 0}deg) translateY(${active ? -1.5 : 0}px) scale(${active ? 1.05 : 1})`,
         transition: active
           ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.6)"
@@ -748,11 +814,17 @@ function Bar({
   activeKey,
   isColor,
   expanded,
+  onNudge,
+  confirmed,
+  visible,
 }: {
   value: string;
   activeKey: "up" | "down" | null;
   isColor: boolean;
   expanded: boolean;
+  onNudge: (direction: "up" | "down") => void;
+  confirmed: boolean;
+  visible: boolean;
 }) {
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -770,7 +842,8 @@ function Bar({
         position: "fixed",
         bottom: expanded ? 20 : 12,
         left: "50%",
-        transform: `translateX(-50%) translateY(${activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0}px) scale(${expanded ? 1 : 0.85})`,
+        transform: `translateX(-50%) translateY(${activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0}px) scale(${!visible ? 0.5 : expanded ? 1 : 0.85})`,
+        opacity: visible ? 1 : 0,
         zIndex: 2147483647,
         display: "flex",
         height: 37,
@@ -778,13 +851,14 @@ function Bar({
         borderRadius: 9999,
         padding: "0 16px",
         background: "#161616",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
         fontSynthesis: "none",
         WebkitFontSmoothing: "antialiased",
         pointerEvents: "auto",
         userSelect: "none",
         transition: activeKey
-          ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1)"
-          : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1)",
+          ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease"
+          : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease",
       }}
     >
       <div
@@ -797,7 +871,22 @@ function Bar({
           alignItems: "center",
         }}
       >
-        {isColor ? null : (
+        {isColor ? (
+          confirmed ? (
+            <span
+              style={{
+                color: "#fff",
+                fontFamily: FONT,
+                fontWeight: 500,
+                fontSize: 14.5,
+                lineHeight: "22px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {value}
+            </span>
+          ) : null
+        ) : (
           <Calligraph
             variant="slots"
             animation="snappy"
@@ -811,6 +900,7 @@ function Bar({
               fontVariantNumeric: "tabular-nums",
               minWidth: 48,
               textAlign: "left",
+              transition: "color 0.15s ease",
             }}
           >
             {value}
@@ -819,8 +909,8 @@ function Bar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <Arrow down active={activeKey === "down"} />
-        <Arrow active={activeKey === "up"} />
+        <Arrow down active={activeKey === "down"} onClick={() => onNudge("down")} />
+        <Arrow active={activeKey === "up"} onClick={() => onNudge("up")} />
       </div>
     </div>
   );
