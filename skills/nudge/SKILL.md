@@ -53,7 +53,30 @@ All property types use the same up/down arrow key interface. The `type` field te
 | opacity | `numeric` | min: 0, max: 1, step: 0.01 |
 | Other numeric | `numeric` | step: 1 |
 
-**Tailwind sources:** resolve the class to its CSS property and value (`p-4` → `padding: 16px`).
+**Tailwind sources:** resolve the class to its CSS property and value. For axis shorthands, use the block-axis property:
+
+| Tailwind class | CSS property | Example |
+|---|---|---|
+| `p-4` | `padding` | `padding: 16px` |
+| `px-4` | `padding-left,padding-right` | `padding-left: 16px` |
+| `py-4` | `padding-top,padding-bottom` | `padding-top: 16px` |
+| `pt-4`, `pb-4`, `pl-4`, `pr-4` | `padding-top`, `padding-bottom`, `padding-left`, `padding-right` | direct mapping |
+| `m-4` | `margin` | `margin: 16px` |
+| `mx-4` | `margin-left,margin-right` | `margin-left: 16px` |
+| `my-4` | `margin-top,margin-bottom` | `margin-top: 16px` |
+| `mt-4`, `mb-4`, `ml-4`, `mr-4` | `margin-top`, `margin-bottom`, `margin-left`, `margin-right` | direct mapping |
+| `gap-4` | `gap` | `gap: 16px` |
+| `gap-x-4` | `column-gap` | `column-gap: 16px` |
+| `gap-y-4` | `row-gap` | `row-gap: 16px` |
+| `w-*` | `width` | `width: 16px` |
+| `h-*` | `height` | `height: 16px` |
+| `rounded-*` | `border-radius` | `border-radius: 8px` |
+| `text-[size]` | `font-size` | `font-size: 14px` |
+| `leading-*` | `line-height` | `line-height: 20px` |
+| `text-[color]` | `color` | `color: #1a1a1a` |
+| `bg-[color]` | `background-color` | `background-color: #fff` |
+
+Resolve Tailwind spacing scale to pixels: multiply the value by 4 (`p-4` = `16px`, `py-2` = `8px`). For arbitrary values like `p-[14px]`, use the literal value.
 
 **CSS sources:** use the raw CSS value directly.
 
@@ -65,6 +88,12 @@ Add `data-nudge-target` to the changed element in source:
 
 ```jsx
 <div data-nudge-target style={{ padding: '16px' }}>
+```
+
+For Tailwind classes, also add an inline style override so the runtime can manipulate the value directly:
+
+```jsx
+<div data-nudge-target className="py-4" style={{ paddingTop: '16px', paddingBottom: '16px' }}>
 ```
 
 For SVG presentation attributes, mark the element that carries the attribute:

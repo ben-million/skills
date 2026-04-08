@@ -228,6 +228,10 @@ function configHash(c: NudgeConfig) {
   return c.property + ":" + c.original + ":" + c.value;
 }
 
+function getProps(property: string) {
+  return property.split(",").map((p) => p.trim());
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -343,12 +347,13 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
     const find = () =>
       document.querySelector("[data-nudge-target]") as Element | null;
+    const firstProp = getProps(config.property)[0];
     const found = find();
     if (found) {
-      const useSvg = isSvgAttr(found, config.property);
+      const useSvg = isSvgAttr(found, firstProp);
       savedValueRef.current = useSvg
-        ? found.getAttribute(config.property) || ""
-        : (found as HTMLElement).style.getPropertyValue(config.property);
+        ? found.getAttribute(firstProp) || ""
+        : (found as HTMLElement).style.getPropertyValue(firstProp);
       setTargetEl(found);
       return;
     }
@@ -357,10 +362,10 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
       const el = find();
       if (el) {
         observer.disconnect();
-        const useSvg = isSvgAttr(el, config.property);
+        const useSvg = isSvgAttr(el, firstProp);
         savedValueRef.current = useSvg
-          ? el.getAttribute(config.property) || ""
-          : (el as HTMLElement).style.getPropertyValue(config.property);
+          ? el.getAttribute(firstProp) || ""
+          : (el as HTMLElement).style.getPropertyValue(firstProp);
         setTargetEl(el);
       }
     });
@@ -371,10 +376,12 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const applyPreview = useCallback(
     (el: Element, val: string) => {
       if (!config) return;
-      if (isSvgAttr(el, config.property)) {
-        el.setAttribute(config.property, val);
-      } else {
-        (el as HTMLElement).style.setProperty(config.property, val);
+      for (const prop of getProps(config.property)) {
+        if (isSvgAttr(el, prop)) {
+          el.setAttribute(prop, val);
+        } else {
+          (el as HTMLElement).style.setProperty(prop, val);
+        }
       }
     },
     [config]
@@ -460,21 +467,23 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     }
 
     function handleCancel() {
-      const useSvg = isSvgAttr(targetEl!, config!.property);
-      if (useSvg) {
-        if (savedValueRef.current) {
-          targetEl!.setAttribute(config!.property, savedValueRef.current);
+      for (const prop of getProps(config!.property)) {
+        const useSvg = isSvgAttr(targetEl!, prop);
+        if (useSvg) {
+          if (savedValueRef.current) {
+            targetEl!.setAttribute(prop, savedValueRef.current);
+          } else {
+            targetEl!.removeAttribute(prop);
+          }
         } else {
-          targetEl!.removeAttribute(config!.property);
-        }
-      } else {
-        if (savedValueRef.current) {
-          (targetEl! as HTMLElement).style.setProperty(
-            config!.property,
-            savedValueRef.current
-          );
-        } else {
-          (targetEl! as HTMLElement).style.removeProperty(config!.property);
+          if (savedValueRef.current) {
+            (targetEl! as HTMLElement).style.setProperty(
+              prop,
+              savedValueRef.current
+            );
+          } else {
+            (targetEl! as HTMLElement).style.removeProperty(prop);
+          }
         }
       }
       dismiss();
@@ -839,18 +848,22 @@ function Bar({
     "margin-right 0.45s cubic-bezier(0.32, 0.72, 0, 1), " +
     "opacity 0.15s ease";
 
+  const baseScale = !visible ? 0.5 : confirmed ? 1.05 : expanded ? 1 : 0.85;
+  const nudgeY = activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0;
+
   return (
     <div
       style={{
         position: "fixed",
         bottom: expanded ? 20 : 12,
         left: "50%",
-        transform: `translateX(-50%) translateY(${activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0}px) scale(${!visible ? 0.5 : expanded ? 1 : 0.85})`,
+        transform: `translateX(-50%) translateY(${nudgeY}px) scale(${baseScale})`,
         opacity: visible ? 1 : 0,
         zIndex: 2147483647,
         display: "flex",
         height: 37,
         alignItems: "center",
+        justifyContent: "center",
         borderRadius: 9999,
         padding: "0 16px",
         background: "#161616",
@@ -859,62 +872,65 @@ function Bar({
         WebkitFontSmoothing: "antialiased",
         pointerEvents: "auto",
         userSelect: "none",
-        transition: activeKey
-          ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease"
-          : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease",
+        transition: confirmed
+          ? "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease"
+          : activeKey
+            ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease"
+            : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease",
       }}
     >
-      <div
-        style={{
-          maxWidth: expanded ? 100 : 0,
-          marginRight: expanded ? 1 : 0,
-          opacity: expanded ? 1 : 0,
-          transition: expanded ? expandTransition : collapseTransition,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        {isColor ? (
-          confirmed ? (
-            <span
-              style={{
-                color: "#fff",
-                fontFamily: FONT,
-                fontWeight: 500,
-                fontSize: 14.5,
-                lineHeight: "22px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {value}
-            </span>
-          ) : null
-        ) : (
-          <Calligraph
-            variant="slots"
-            animation="snappy"
+      {confirmed ? (
+        <span
+          style={{
+            color: "#fff",
+            fontFamily: FONT,
+            fontWeight: 500,
+            fontSize: 14.5,
+            lineHeight: "22px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Prompt copied
+        </span>
+      ) : (
+        <>
+          <div
             style={{
-              color: "#fff",
-              fontFamily: FONT,
-              fontWeight: 500,
-              fontSize: 14.5,
-              lineHeight: "22px",
-              whiteSpace: "nowrap",
-              fontVariantNumeric: "tabular-nums",
-              minWidth: 48,
-              textAlign: "left",
-              transition: "color 0.15s ease",
+              maxWidth: expanded ? 100 : 0,
+              marginRight: expanded ? 1 : 0,
+              opacity: expanded ? 1 : 0,
+              transition: expanded ? expandTransition : collapseTransition,
+              display: "flex",
+              alignItems: "center",
             }}
           >
-            {value}
-          </Calligraph>
-        )}
-      </div>
+            {isColor ? null : (
+              <Calligraph
+                variant="slots"
+                animation="snappy"
+                style={{
+                  color: "#fff",
+                  fontFamily: FONT,
+                  fontWeight: 500,
+                  fontSize: 14.5,
+                  lineHeight: "22px",
+                  whiteSpace: "nowrap",
+                  fontVariantNumeric: "tabular-nums",
+                  minWidth: 48,
+                  textAlign: "left",
+                }}
+              >
+                {value}
+              </Calligraph>
+            )}
+          </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <Arrow down active={activeKey === "down"} onClick={() => onNudge("down")} />
-        <Arrow active={activeKey === "up"} onClick={() => onNudge("up")} />
-      </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <Arrow down active={activeKey === "down"} onClick={() => onNudge("down")} />
+            <Arrow active={activeKey === "up"} onClick={() => onNudge("up")} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
