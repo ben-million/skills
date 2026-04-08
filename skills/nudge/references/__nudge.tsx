@@ -232,6 +232,8 @@ function configHash(c: NudgeConfig) {
 // ---------------------------------------------------------------------------
 
 export function Nudge({ config }: { config?: NudgeConfig | null }) {
+  if (process.env.NODE_ENV === "production") return null;
+
   const [mounted, setMounted] = useState(false);
   const [targetEl, setTargetEl] = useState<Element | null>(null);
   const [currentValue, setCurrentValue] = useState("");
