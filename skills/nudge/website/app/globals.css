@@ -189,8 +189,8 @@
   scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
 }
 
-.home-page-below-hero,
-.home-page-below-hero *:not(.budge-me-paper-preview *) {
+.page-content,
+.page-content *:not(.budge-me-paper-preview *) {
   font-family:
     system-ui,
     -apple-system,
@@ -199,8 +199,8 @@
     sans-serif !important;
 }
 
-.home-page-below-hero .font-mono-override,
-.home-page-below-hero .font-mono-override * {
+.page-content .font-mono-override,
+.page-content .font-mono-override * {
   font-family: "JetBrains Mono", monospace !important;
 }
 

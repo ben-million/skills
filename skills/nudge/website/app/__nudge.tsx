@@ -277,12 +277,6 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
   useEffect(() => {
     setMounted(true);
-    if (!document.querySelector('link[href*="open-runde"]')) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://fonts.cdnfonts.com/css/open-runde";
-      document.head.appendChild(link);
-    }
   }, []);
 
   // Reset state when config changes

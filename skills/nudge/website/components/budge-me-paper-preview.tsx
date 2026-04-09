@@ -174,12 +174,15 @@ function playDoubleTick() {
 function Arrow({
   active,
   down,
+  disabled,
   onClick,
 }: {
   active: boolean;
   down?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 }) {
+  const fill = disabled ? "#A7A7A7" : active ? "#FFFFFF" : "#A7A7A7";
   return (
     <svg
       width="1em"
@@ -187,13 +190,13 @@ function Arrow({
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       style={{
         width: 19,
         height: "auto",
         flexShrink: 0,
-        cursor: "pointer",
-        transform: `rotate(${down ? 180 : 0}deg) translateY(${active ? -1.5 : 0}px) scale(${active ? 1.05 : 1})`,
+        cursor: disabled ? "default" : "pointer",
+        transform: `rotate(${down ? 180 : 0}deg) translateY(${active && !disabled ? -1.5 : 0}px) scale(${active && !disabled ? 1.05 : 1})`,
         transition: active
           ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.6)"
           : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
@@ -203,16 +206,50 @@ function Arrow({
         fillRule="evenodd"
         clipRule="evenodd"
         d={ARROW_D}
-        fill={active ? "#FFFFFF" : "#A7A7A7"}
+        fill={fill}
         style={{
-          transition: active ? "fill 0.05s ease" : "fill 0.3s ease",
+          transition: disabled
+            ? "fill 0.2s ease"
+            : active ? "fill 0.05s ease" : "fill 0.3s ease",
         }}
       />
     </svg>
   );
 }
 
-export function BudgeMePaperPreview() {
+export interface PreviewFeatures {
+  keyboard?: boolean;
+  expandValue?: boolean;
+  arrowBounce?: boolean;
+  barPhysics?: boolean;
+  boundaryShake?: boolean;
+  sound?: boolean;
+  buttonFeedback?: boolean;
+  numberInput?: boolean;
+  shiftStep?: boolean;
+  idleOpacity?: boolean;
+  showLabel?: boolean;
+  showButtons?: boolean;
+  showText?: boolean;
+}
+
+const ALL_FEATURES: PreviewFeatures = {
+  keyboard: true,
+  expandValue: true,
+  arrowBounce: true,
+  barPhysics: true,
+  boundaryShake: true,
+  sound: true,
+  buttonFeedback: true,
+  numberInput: true,
+  shiftStep: true,
+  idleOpacity: true,
+  showLabel: true,
+  showButtons: true,
+  showText: true,
+};
+
+export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?: PreviewFeatures } = {}) {
   const [value, setValue] = useState(ORIGINAL);
   const [typedRaw, setTypedRaw] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
@@ -254,20 +291,22 @@ export function BudgeMePaperPreview() {
   };
 
   const step = useCallback((direction: number, shift = false, held = false) => {
-    const mult = shift ? 10 : 1;
+    const mult = (f.shiftStep && shift) ? 10 : 1;
     const next = valueRef.current + direction * mult;
     if (next > 86 || next < 32) {
-      setShaking(true);
-      clearTimeout(shakeTimeoutRef.current);
-      shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
-      playAlert();
+      if (f.boundaryShake) {
+        setShaking(true);
+        clearTimeout(shakeTimeoutRef.current);
+        shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
+      }
+      if (f.sound) playAlert();
       return;
     }
     setShaking(false);
     valueRef.current = next;
     setValue(valueRef.current);
-    playTick(held);
-  }, []);
+    if (f.sound) playTick(held);
+  }, [f.shiftStep, f.boundaryShake, f.sound]);
 
   const triggerNudge = useCallback(
     (dir: "up" | "down") => {
@@ -283,56 +322,64 @@ export function BudgeMePaperPreview() {
     valueRef.current = ORIGINAL;
     setValue(ORIGINAL);
     setIsNudging(true);
-    setPressedButton("reset");
+    if (f.buttonFeedback) setPressedButton("reset");
     clearTimeout(nudgeTimeoutRef.current);
     nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
-    setTimeout(() => setPressedButton(null), 70);
-    if (Math.floor(prev / 10) !== Math.floor(ORIGINAL / 10)) {
-      playDoubleTick();
-    } else {
-      playTick();
+    if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
+    if (f.sound) {
+      if (Math.floor(prev / 10) !== Math.floor(ORIGINAL / 10)) {
+        playDoubleTick();
+      } else {
+        playTick();
+      }
     }
-  }, []);
+  }, [f.buttonFeedback, f.sound]);
 
   const copy = useCallback(() => {
     const prompt = `Set \`font-size\` to \`${valueRef.current}px\``;
     navigator.clipboard?.writeText(prompt);
     setConfirmed(true);
     setIsNudging(true);
-    setPressedButton("copy");
+    if (f.buttonFeedback) setPressedButton("copy");
     clearTimeout(confirmedTimeoutRef.current);
     confirmedTimeoutRef.current = setTimeout(() => {
       setConfirmed(false);
       setIsNudging(false);
     }, 800);
-    setTimeout(() => setPressedButton(null), 70);
-    playConfirm();
-  }, []);
+    if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
+    if (f.sound) playConfirm();
+  }, [f.buttonFeedback, f.sound]);
 
   useEffect(() => {
+    if (!f.keyboard) return;
+
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "ArrowUp") {
         e.preventDefault();
         step(1, e.shiftKey, e.repeat);
         setActiveKey("up");
-        setIsNudging(true);
-        clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+        if (f.expandValue) {
+          setIsNudging(true);
+          clearTimeout(nudgeTimeoutRef.current);
+          nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+        }
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         step(-1, e.shiftKey, e.repeat);
         setActiveKey("down");
-        setIsNudging(true);
-        clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
-      } else if (e.key >= "0" && e.key <= "9") {
+        if (f.expandValue) {
+          setIsNudging(true);
+          clearTimeout(nudgeTimeoutRef.current);
+          nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+        }
+      } else if (f.numberInput && e.key >= "0" && e.key <= "9") {
         e.preventDefault();
         digitBufferRef.current += e.key;
         const num = parseInt(digitBufferRef.current, 10);
         if (!isNaN(num)) {
           setTypedRaw(digitBufferRef.current);
           setIsNudging(true);
-          playTick();
+          if (f.sound) playTick();
           if (num >= 32 && num <= 86) {
             valueRef.current = num;
             setValue(num);
@@ -348,10 +395,12 @@ export function BudgeMePaperPreview() {
             valueRef.current = clamped;
             setValue(clamped);
             setTypedRaw(null);
-            setShaking(true);
-            clearTimeout(shakeTimeoutRef.current);
-            shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
-            playAlert();
+            if (f.boundaryShake) {
+              setShaking(true);
+              clearTimeout(shakeTimeoutRef.current);
+              shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
+            }
+            if (f.sound) playAlert();
             nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
           } else {
             setTypedRaw(null);
@@ -380,11 +429,13 @@ export function BudgeMePaperPreview() {
       document.removeEventListener("keyup", onKeyUp);
       clearTimeout(nudgeTimeoutRef.current);
     };
-  }, [step, reset, copy]);
+  }, [step, reset, copy, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, f.sound]);
 
   const displayValue = typedRaw !== null ? `${typedRaw}px` : `${value}px`;
-  const nudgeY = activeKey === "down" ? 1.5 : activeKey === "up" ? -1.5 : 0;
-  const baseScale = confirmed ? 1.02 : isNudging ? 1 : 0.92;
+  const atMin = value <= 32;
+  const atMax = value >= 86;
+  const nudgeY = f.barPhysics ? (activeKey === "down" ? 1.5 : activeKey === "up" ? -1.5 : 0) : 0;
+  const baseScale = f.barPhysics ? (confirmed ? 1.02 : isNudging ? 1 : 0.92) : 1;
 
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -397,20 +448,24 @@ export function BudgeMePaperPreview() {
 
   return (
     <div className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4">
-      <div className="flex flex-col items-center grow shrink basis-[0%] gap-7">
-        <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/[22px] text-[#696969] pt-3.5 self-start pl-4">
-          font size
-        </div>
-        <div
-          className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
-          style={{
-            fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
-            fontSize: `${value}px`,
-            transition: "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-          }}
-        >
-          budge me
-        </div>
+      <div className={`flex flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
+        {f.showLabel !== false && (
+          <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#696969] pt-3.5 self-start pl-4">
+            font size
+          </div>
+        )}
+        {f.showText !== false && (
+          <div
+            className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
+            style={{
+              fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
+              fontSize: `${value}px`,
+              transition: "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
+          >
+            budge me
+          </div>
+        )}
 
         <div
           ref={barRef}
@@ -427,12 +482,14 @@ export function BudgeMePaperPreview() {
             WebkitFontSmoothing: "antialiased",
             userSelect: "none",
             transform: `translateY(${nudgeY}px) scale(${baseScale})`,
-            opacity: isNudging || confirmed ? 1 : 0.8,
-            transition: confirmed
-              ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), opacity 0.2s ease"
-              : activeKey
-                ? "transform 0.06s cubic-bezier(0.2, 0, 0, 1), opacity 0.1s ease"
-                : "transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15), opacity 0.4s ease 0.1s",
+            opacity: f.idleOpacity ? (isNudging || confirmed ? 1 : 0.8) : 1,
+            transition: f.barPhysics
+              ? (confirmed
+                  ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), opacity 0.2s ease"
+                  : activeKey
+                    ? "transform 0.06s cubic-bezier(0.2, 0, 0, 1), opacity 0.1s ease"
+                    : "transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15), opacity 0.4s ease 0.1s")
+              : "opacity 0.3s ease",
             animation: shaking
               ? "__nudge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
               : "none",
@@ -470,7 +527,7 @@ export function BudgeMePaperPreview() {
                   variant="slots"
                   animation="snappy"
                   style={{
-                    color: "#fff",
+                    color: shaking ? "#A7A7A7" : "#fff",
                     fontFamily: FONT,
                     fontWeight: 500,
                     fontSize: 14.5,
@@ -479,6 +536,7 @@ export function BudgeMePaperPreview() {
                     fontVariantNumeric: "tabular-nums",
                     minWidth: 48,
                     textAlign: "left",
+                    transition: "color 0.2s ease",
                   }}
                 >
                   {displayValue}
@@ -488,11 +546,13 @@ export function BudgeMePaperPreview() {
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <Arrow
                   down
-                  active={activeKey === "down"}
+                  active={f.arrowBounce ? activeKey === "down" : false}
+                  disabled={shaking && atMin}
                   onClick={() => triggerNudge("down")}
                 />
                 <Arrow
-                  active={activeKey === "up"}
+                  active={f.arrowBounce ? activeKey === "up" : false}
+                  disabled={shaking && atMax}
                   onClick={() => triggerNudge("up")}
                 />
               </div>
@@ -501,44 +561,46 @@ export function BudgeMePaperPreview() {
         </div>
       </div>
 
-      <div className="flex items-center justify-center h-17.25 shrink-0 gap-3.25 border-t border-solid border-t-[#EEEEEE]">
-        <button
-          type="button"
-          onClick={reset}
-          className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
-          style={{
-            transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
-            transition: pressedButton === "reset"
-              ? "transform 0.03s linear"
-              : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-          }}
-        >
-          <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
-            Reset
-          </div>
-          <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
-            R
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={copy}
-          className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
-          style={{
-            transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
-            transition: pressedButton === "copy"
-              ? "transform 0.03s linear"
-              : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-          }}
-        >
-          <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
-            Copy
-          </div>
-          <div className="[letter-spacing:0px] w-max h-3.75 left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
-            ↵
-          </div>
-        </button>
-      </div>
+      {f.showButtons !== false && (
+        <div className="flex items-center justify-center h-17.25 shrink-0 gap-3.25 border-t border-solid border-t-[#EEEEEE]">
+          <button
+            type="button"
+            onClick={reset}
+            className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+            style={f.buttonFeedback ? {
+              transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
+              transition: pressedButton === "reset"
+                ? "transform 0.03s linear"
+                : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+            } : undefined}
+          >
+            <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
+              Reset
+            </div>
+            <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
+              R
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={copy}
+            className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+            style={f.buttonFeedback ? {
+              transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
+              transition: pressedButton === "copy"
+                ? "transform 0.03s linear"
+                : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+            } : undefined}
+          >
+            <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
+              Copy
+            </div>
+            <div className="[letter-spacing:0px] w-max h-3.75 left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
+              ↵
+            </div>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

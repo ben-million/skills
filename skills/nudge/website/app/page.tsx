@@ -33,15 +33,15 @@ export default function HomePage() {
 
   return (
     <div className="[font-synthesis:none] overflow-x-clip antialiased min-h-screen bg-white flex flex-col items-center">
-      <div className="home-page-below-hero w-full flex flex-col items-center pt-3 sm:pt-6">
+      <div className="page-content w-full flex flex-col items-center pt-3 sm:pt-6">
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0">
-          <div className="mb-0 mt-8 left-0 top-0 w-full min-w-0 [white-space-collapse:preserve] relative text-[#3F3F3F] font-['OpenRunde-Semibold','Open_Runde',system-ui,sans-serif] font-semibold text-[18px]/5.75">
+          <div className="mb-0 mt-8 left-0 top-0 w-full min-w-0 [white-space-collapse:preserve] relative text-[#3F3F3F] font-semibold text-[18px]/5.75">
             budge
           </div>
-          <div className="[letter-spacing:0em] [white-space-collapse:preserve] mt-[17px] mb-6 font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/[22px] text-[#696969]">
+          <div className="[letter-spacing:0em] [white-space-collapse:preserve] mt-[17px] mb-6 font-medium text-[15px]/[22px] text-[#696969]">
             the tiny design companion for your agent
           </div>
-          <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/[22px] text-[#707070]">
+          <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#707070]">
             &ldquo;add space above X&rdquo; or &ldquo;make Y less subtle&rdquo; gets you 90% of the
             way there. budge is for the last 10; a tiny stepper appears on the page and you arrow-key
             the value. Just like nudging in your favourite design tool.
@@ -56,14 +56,14 @@ export default function HomePage() {
             className="[font-synthesis:none] mt-[23px] flex w-full flex-row items-center justify-between rounded-[14px] py-3 pr-3.5 pl-3.75 gap-3 [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased cursor-text bg-white"
           >
               <div className="flex min-w-0 flex-1 items-center gap-2.75">
-                <div className="left-0 top-0 [white-space-collapse:preserve] w-max shrink-0 font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[16px]/5.75 text-[#696969]">
+                <div className="left-0 top-0 [white-space-collapse:preserve] w-max shrink-0 font-medium text-[16px]/5.75 text-[#696969]">
                   $
                 </div>
                 <div
                   ref={commandRef}
                   data-nudge-target
                   style={{ fontSize: "15px" }}
-                  className="left-0 top-0 min-w-0 truncate font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/5.75 text-[#414141] [white-space-collapse:preserve]"
+                  className="left-0 top-0 min-w-0 truncate font-medium text-[15px]/5.75 text-[#414141] [white-space-collapse:preserve]"
                 >
                   {commandText}
                 </div>
