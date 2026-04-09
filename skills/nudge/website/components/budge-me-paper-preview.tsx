@@ -23,50 +23,50 @@ function getAudioCtx() {
   return audioCtx;
 }
 
+let tickBuffer: AudioBuffer | null = null;
+
+function getTickBuffer(ctx: AudioContext) {
+  if (tickBuffer && tickBuffer.sampleRate === ctx.sampleRate) return tickBuffer;
+  const sr = ctx.sampleRate;
+  const dur = 0.008;
+  const len = Math.ceil(sr * dur);
+  const buf = ctx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+
+  let seed = 7;
+  function noise() {
+    seed = (seed * 16807 + 0) % 2147483647;
+    return (seed / 2147483647) * 2 - 1;
+  }
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+
+    // Sharp strike impulse (first ~0.3ms)
+    const strike = noise() * Math.exp(-t * 20000);
+    // Metallic ring — the pawl/spring resonance
+    const ring = Math.sin(2 * Math.PI * 3200 * t) * Math.exp(-t * 1800);
+    // Secondary resonance — adds metallic complexity
+    const ring2 = Math.sin(2 * Math.PI * 5100 * t) * Math.exp(-t * 2500);
+    // Low body — subtle weight of the mechanism
+    const body = Math.sin(2 * Math.PI * 900 * t) * Math.exp(-t * 4000);
+
+    d[i] = 0.2 * strike + 0.4 * ring + 0.25 * ring2 + 0.15 * body;
+  }
+
+  tickBuffer = buf;
+  return buf;
+}
+
 function scheduleTick(time: number, volume: number) {
   const ctx = getAudioCtx();
-
-  // Metallic transient — resonant filtered noise
-  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.004), ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource();
-  noise.buffer = buf;
-  const bp = ctx.createBiquadFilter();
-  bp.type = "bandpass";
-  bp.frequency.value = 3200;
-  bp.Q.value = 6;
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(volume * 0.7, time);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.003);
-  noise.connect(bp);
-  bp.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noise.start(time);
-
-  // Resonant body — short metallic ring
-  const body = ctx.createOscillator();
-  const bodyGain = ctx.createGain();
-  body.type = "sine";
-  body.frequency.value = 1800;
-  bodyGain.gain.setValueAtTime(volume * 0.4, time);
-  bodyGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.012);
-  body.connect(bodyGain);
-  bodyGain.connect(ctx.destination);
-  body.start(time);
-  body.stop(time + 0.015);
-
-  // High ping — crisp edge
-  const ping = ctx.createOscillator();
-  const pingGain = ctx.createGain();
-  ping.type = "sine";
-  ping.frequency.value = 4800;
-  pingGain.gain.setValueAtTime(volume * 0.15, time);
-  pingGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.004);
-  ping.connect(pingGain);
-  pingGain.connect(ctx.destination);
-  ping.start(time);
-  ping.stop(time + 0.006);
+  const src = ctx.createBufferSource();
+  src.buffer = getTickBuffer(ctx);
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(time);
 }
 
 function playConfirm() {
@@ -206,15 +206,9 @@ export function BudgeMePaperPreview() {
       return;
     }
     setShaking(false);
-    const prev = valueRef.current;
     valueRef.current = next;
     setValue(valueRef.current);
-    const tensChanged = Math.floor(prev / 10) !== Math.floor(next / 10);
-    if (tensChanged && !held) {
-      playDoubleTick();
-    } else {
-      playTick(held);
-    }
+    playTick(held);
   }, []);
 
   const triggerNudge = useCallback(
