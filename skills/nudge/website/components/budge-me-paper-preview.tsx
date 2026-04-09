@@ -23,24 +23,34 @@ function getAudioCtx() {
   return audioCtx;
 }
 
-function scheduleTick(time: number, volume: number, freq: number) {
+function scheduleTick(time: number, volume: number) {
   const ctx = getAudioCtx();
 
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  // Low thump for body
+  const lo = ctx.createOscillator();
+  const loGain = ctx.createGain();
+  lo.type = "sine";
+  lo.frequency.setValueAtTime(500, time);
+  lo.frequency.exponentialRampToValueAtTime(200, time + 0.006);
+  loGain.gain.setValueAtTime(volume * 0.8, time);
+  loGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.008);
+  lo.connect(loGain);
+  loGain.connect(ctx.destination);
+  lo.start(time);
+  lo.stop(time + 0.012);
 
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(freq, time);
-  osc.frequency.exponentialRampToValueAtTime(freq * 0.7, time + 0.003);
-
-  gain.gain.setValueAtTime(volume, time);
-  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.005);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start(time);
-  osc.stop(time + 0.008);
+  // High snap for click
+  const hi = ctx.createOscillator();
+  const hiGain = ctx.createGain();
+  hi.type = "triangle";
+  hi.frequency.setValueAtTime(2200, time);
+  hi.frequency.exponentialRampToValueAtTime(1200, time + 0.002);
+  hiGain.gain.setValueAtTime(volume * 0.5, time);
+  hiGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.004);
+  hi.connect(hiGain);
+  hiGain.connect(ctx.destination);
+  hi.start(time);
+  hi.stop(time + 0.006);
 }
 
 function playTick(held = false) {
@@ -49,7 +59,7 @@ function playTick(held = false) {
   lastTickTime = now;
 
   const ctx = getAudioCtx();
-  scheduleTick(ctx.currentTime, held ? 0.012 : 0.03, held ? 1100 : 1300);
+  scheduleTick(ctx.currentTime, held ? 0.12 : 0.25);
 }
 
 function playScrollTicks(count: number) {
@@ -57,7 +67,7 @@ function playScrollTicks(count: number) {
   const ctx = getAudioCtx();
 
   for (let i = 0; i < count; i++) {
-    scheduleTick(ctx.currentTime + i * 0.02, 0.02, 1200);
+    scheduleTick(ctx.currentTime + i * 0.02, 0.2);
   }
 }
 
