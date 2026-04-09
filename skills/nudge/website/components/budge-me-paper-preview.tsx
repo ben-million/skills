@@ -26,31 +26,96 @@ function getAudioCtx() {
 function scheduleTick(time: number, volume: number) {
   const ctx = getAudioCtx();
 
-  // Low thump for body
-  const lo = ctx.createOscillator();
-  const loGain = ctx.createGain();
-  lo.type = "sine";
-  lo.frequency.setValueAtTime(500, time);
-  lo.frequency.exponentialRampToValueAtTime(200, time + 0.006);
-  loGain.gain.setValueAtTime(volume * 0.8, time);
-  loGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.008);
-  lo.connect(loGain);
-  loGain.connect(ctx.destination);
-  lo.start(time);
-  lo.stop(time + 0.012);
+  // Metallic transient — resonant filtered noise
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.004), ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 3200;
+  bp.Q.value = 6;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(volume * 0.7, time);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.003);
+  noise.connect(bp);
+  bp.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(time);
 
-  // High snap for click
-  const hi = ctx.createOscillator();
-  const hiGain = ctx.createGain();
-  hi.type = "triangle";
-  hi.frequency.setValueAtTime(2200, time);
-  hi.frequency.exponentialRampToValueAtTime(1200, time + 0.002);
-  hiGain.gain.setValueAtTime(volume * 0.5, time);
-  hiGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.004);
-  hi.connect(hiGain);
-  hiGain.connect(ctx.destination);
-  hi.start(time);
-  hi.stop(time + 0.006);
+  // Resonant body — short metallic ring
+  const body = ctx.createOscillator();
+  const bodyGain = ctx.createGain();
+  body.type = "sine";
+  body.frequency.value = 1800;
+  bodyGain.gain.setValueAtTime(volume * 0.4, time);
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.012);
+  body.connect(bodyGain);
+  bodyGain.connect(ctx.destination);
+  body.start(time);
+  body.stop(time + 0.015);
+
+  // High ping — crisp edge
+  const ping = ctx.createOscillator();
+  const pingGain = ctx.createGain();
+  ping.type = "sine";
+  ping.frequency.value = 4800;
+  pingGain.gain.setValueAtTime(volume * 0.15, time);
+  pingGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.004);
+  ping.connect(pingGain);
+  pingGain.connect(ctx.destination);
+  ping.start(time);
+  ping.stop(time + 0.006);
+}
+
+function playConfirm() {
+  const ctx = getAudioCtx();
+  const t = ctx.currentTime;
+
+  // Heavy thock — low impact
+  const thock = ctx.createOscillator();
+  const thockGain = ctx.createGain();
+  thock.type = "sine";
+  thock.frequency.setValueAtTime(350, t);
+  thock.frequency.exponentialRampToValueAtTime(80, t + 0.015);
+  thockGain.gain.setValueAtTime(0.35, t);
+  thockGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+  thock.connect(thockGain);
+  thockGain.connect(ctx.destination);
+  thock.start(t);
+  thock.stop(t + 0.03);
+
+  // Click transient — filtered noise burst
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.008, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 3500;
+  bp.Q.value = 1.5;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.18, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.006);
+  noise.connect(bp);
+  bp.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(t);
+
+  // Latch settle — secondary lighter click
+  const latch = ctx.createOscillator();
+  const latchGain = ctx.createGain();
+  latch.type = "sine";
+  latch.frequency.setValueAtTime(600, t + 0.04);
+  latch.frequency.exponentialRampToValueAtTime(250, t + 0.05);
+  latchGain.gain.setValueAtTime(0.15, t + 0.04);
+  latchGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+  latch.connect(latchGain);
+  latchGain.connect(ctx.destination);
+  latch.start(t + 0.04);
+  latch.stop(t + 0.06);
 }
 
 function playTick(held = false) {
@@ -62,13 +127,10 @@ function playTick(held = false) {
   scheduleTick(ctx.currentTime, held ? 0.12 : 0.25);
 }
 
-function playScrollTicks(count: number) {
-  if (count <= 0) return;
+function playDoubleTick() {
   const ctx = getAudioCtx();
-
-  for (let i = 0; i < count; i++) {
-    scheduleTick(ctx.currentTime + i * 0.02, 0.2);
-  }
+  scheduleTick(ctx.currentTime, 0.25);
+  scheduleTick(ctx.currentTime + 0.055, 0.15);
 }
 
 function Arrow({
@@ -149,7 +211,7 @@ export function BudgeMePaperPreview() {
     setValue(valueRef.current);
     const tensChanged = Math.floor(prev / 10) !== Math.floor(next / 10);
     if (tensChanged && !held) {
-      playScrollTicks(2);
+      playDoubleTick();
     } else {
       playTick(held);
     }
@@ -174,7 +236,7 @@ export function BudgeMePaperPreview() {
     nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
     setTimeout(() => setPressedButton(null), 70);
     if (Math.floor(prev / 10) !== Math.floor(ORIGINAL / 10)) {
-      playScrollTicks(2);
+      playDoubleTick();
     } else {
       playTick();
     }
@@ -192,6 +254,7 @@ export function BudgeMePaperPreview() {
       setIsNudging(false);
     }, 800);
     setTimeout(() => setPressedButton(null), 70);
+    playConfirm();
   }, []);
 
   useEffect(() => {
