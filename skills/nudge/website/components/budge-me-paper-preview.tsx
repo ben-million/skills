@@ -13,6 +13,8 @@ const ORIGINAL = 61;
 const SLIDES = [
   { label: "font size", min: 32, max: 86, original: 61, unit: "px", demo: 48 },
   { label: "opacity", min: 0, max: 100, original: 50, unit: "%", demo: 30 },
+  { label: "padding", min: 0, max: 48, original: 16, unit: "px", demo: 6 },
+  { label: "color", min: 0, max: 360, original: 220, unit: "°", demo: 160 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -181,13 +183,15 @@ function Arrow({
   down,
   disabled,
   onClick,
+  activeColor,
 }: {
   active: boolean;
   down?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  activeColor?: string;
 }) {
-  const fill = disabled ? "#A7A7A7" : active ? "#FFFFFF" : "#A7A7A7";
+  const fill = disabled ? "#A7A7A7" : active ? (activeColor ?? "#FFFFFF") : "#A7A7A7";
   return (
     <svg
       width="1em"
@@ -294,7 +298,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     valueRef.current = cfg.original;
     setValue(cfg.original);
     setTypedRaw(null);
-    setIsNudging(false);
+    setIsNudging(true);
     setShaking(false);
     setConfirmed(false);
     setActiveKey(null);
@@ -417,8 +421,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
 
   const copy = useCallback(() => {
     cancelCalibration();
-    const prop = slide === 0 ? "font-size" : "opacity";
-    const val = slide === 0 ? `${valueRef.current}px` : `${valueRef.current}%`;
+    const props = ["font-size", "opacity", "padding", "color"];
+    const prop = props[slide] ?? props[0];
+    const val = slide === 3 ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${s.unit}`;
     const prompt = `Set \`${prop}\` to \`${val}\``;
     navigator.clipboard?.writeText(prompt);
     setConfirmed(true);
@@ -527,8 +532,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
   })();
   const atMin = value <= s.min;
   const atMax = value >= s.max;
-  const nudgeY = f.barPhysics ? (activeKey === "down" ? 1.5 : activeKey === "up" ? -1.5 : 0) : 0;
-  const baseScale = f.barPhysics ? (confirmed ? 1.02 : isNudging ? 1 : 0.92) : 1;
+  const isColorSlide = slide === 3;
+  const targetColor = `hsl(${value}, 70%, 55%)`;
+  const nudgeY = 0;
+  const baseScale = f.barPhysics ? (confirmed ? 1.02 : isNudging ? 1 : 0.8) : 1;
 
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -543,23 +550,49 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     <div className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4">
       <div className={`flex flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
-          <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#696969] pt-3.5 self-start pl-4">
+          <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] pt-3.5 self-center uppercase">
 {s.label}
           </div>
         )}
         {f.showText !== false && (
-          <div
-            className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
-            style={{
-              fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
-              fontSize: slide === 0 ? `${value}px` : '61px',
-              opacity: slide === 1 ? value / 100 : 1,
-              transition: slide === 0
-                ? "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
-                : "opacity 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-            }}
-          >
-            budge me
+          <div style={{
+            position: "relative",
+            padding: slide === 2 ? value : 0,
+            marginTop: slide === 2 ? 12 - value : 12,
+            marginBottom: slide === 2 ? -value : 0,
+            background: slide === 2 ? "rgba(59, 130, 246, 0.08)" : "transparent",
+            borderRadius: slide === 2 ? 6 : 0,
+            transition: "padding 0.1s cubic-bezier(0.32, 0.72, 0, 1), margin 0.1s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s ease, border-radius 0.2s ease",
+          }}>
+            {slide === 2 && (
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                border: "1.5px dashed rgba(59, 130, 246, 0.35)",
+                borderRadius: 6,
+                pointerEvents: "none",
+              }} />
+            )}
+            <div
+              className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
+              style={{
+                fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
+                fontSize: slide === 0 ? `${value}px` : '61px',
+                opacity: slide === 1 ? value / 100 : 1,
+                color: isColorSlide ? targetColor : undefined,
+                background: slide === 2 ? "#FEFEFE" : "transparent",
+                borderRadius: slide === 2 ? 3 : 0,
+                transition: slide === 0
+                  ? "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                  : slide === 1
+                    ? "opacity 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                    : isColorSlide
+                      ? "color 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                      : "background 0.2s ease",
+              }}
+            >
+              budge
+            </div>
           </div>
         )}
 
@@ -572,6 +605,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
             justifyContent: "center",
             borderRadius: 9999,
             padding: "0 16px",
+            marginTop: "auto",
+            marginBottom: 24,
             background: "#161616",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
             fontSynthesis: "none",
@@ -582,9 +617,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
             transition: f.barPhysics
               ? (confirmed
                   ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), opacity 0.2s ease"
-                  : activeKey
-                    ? "transform 0.06s cubic-bezier(0.2, 0, 0, 1), opacity 0.1s ease"
-                    : "transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15), opacity 0.4s ease 0.1s")
+                  : isNudging
+                    ? "transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease"
+                    : "transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease 0.1s")
               : "opacity 0.3s ease",
             animation: shaking
               ? "__nudge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
@@ -608,9 +643,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
             <>
               <div
                 style={{
-                  maxWidth: isNudging ? 100 : 0,
-                  marginRight: isNudging ? 1 : 0,
-                  opacity: isNudging ? 1 : 0,
+                  maxWidth: isNudging && !isColorSlide ? 100 : 0,
+                  marginRight: isNudging && !isColorSlide ? 1 : 0,
+                  opacity: isNudging && !isColorSlide ? 1 : 0,
                   transition: isNudging
                     ? expandTransition
                     : collapseTransition,
@@ -664,11 +699,13 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
                   active={f.arrowBounce ? activeKey === "down" : false}
                   disabled={shaking && atMin}
                   onClick={() => triggerNudge("down")}
+                  activeColor={isColorSlide ? targetColor : undefined}
                 />
                 <Arrow
                   active={f.arrowBounce ? activeKey === "up" : false}
                   disabled={shaking && atMax}
                   onClick={() => triggerNudge("up")}
+                  activeColor={isColorSlide ? targetColor : undefined}
                 />
               </div>
             </>
@@ -677,10 +714,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
       </div>
 
       {f.showButtons !== false && (
-        <div className="flex items-center justify-between h-17.25 shrink-0 px-4 border-t border-solid border-t-[#EEEEEE]">
+        <div className="flex items-center justify-between h-15 shrink-0 px-3.5 border-t border-solid border-t-[#EEEEEE]">
           <div
             onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide - 1); }}
-            className="flex items-center justify-center rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+            className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
             style={{
               visibility: slide === 0 ? "hidden" : "visible",
               ...(f.buttonFeedback ? {
@@ -691,15 +728,15 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
               } : {}),
             }}
           >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '24.14px', height: '24.14px', flexShrink: 0 }}>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px', flexShrink: 0 }}>
               <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" />
             </svg>
           </div>
-          <div className="flex items-center gap-3.25">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={reset}
-              className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+              className="cursor-pointer flex items-center justify-center w-24.5 h-8 rounded-full gap-5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
               style={f.buttonFeedback ? {
                 transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
                 transition: pressedButton === "reset"
@@ -707,17 +744,17 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
                   : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
               } : undefined}
             >
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[14px]/4.5">
                 Reset
               </div>
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[14px]/4.5">
                 R
               </div>
             </button>
             <button
               type="button"
               onClick={copy}
-              className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+              className="cursor-pointer flex items-center justify-center w-24.5 h-8 rounded-full gap-5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
               style={f.buttonFeedback ? {
                 transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
                 transition: pressedButton === "copy"
@@ -725,17 +762,17 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
                   : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
               } : undefined}
             >
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[14px]/4.5">
                 Copy
               </div>
-              <div className="[letter-spacing:0px] w-max h-3.75 left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[14px]/4.5">
                 ↵
               </div>
             </button>
           </div>
           <div
             onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide + 1); }}
-            className="flex items-center justify-center rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+            className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
             style={{
               visibility: slide === SLIDES.length - 1 ? "hidden" : "visible",
               ...(f.buttonFeedback ? {
@@ -746,7 +783,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
               } : {}),
             }}
           >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '24.14px', height: 'auto', flexShrink: 0, transformOrigin: '50% 50%' }}>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '20px', height: '20px', flexShrink: 0, transformOrigin: '50% 50%' }}>
               <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" style={{ transformOrigin: '50% 50%' }} />
             </svg>
           </div>
