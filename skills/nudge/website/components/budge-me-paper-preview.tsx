@@ -278,6 +278,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const digitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
   const calibrationRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const calibratedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (!shakeInjected) {
@@ -315,45 +316,51 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     clearTimeout(shakeTimeoutRef.current);
     clearTimeout(confirmedTimeoutRef.current);
 
-    const steps: [number, number][] = [];
-    const range = cfg.original - cfg.demo;
-    const downSteps = 4;
-    const upSteps = 5;
-    let t = 200;
+    if (!calibratedRef.current.has(index)) {
+      calibratedRef.current.add(index);
 
-    for (let i = 1; i <= downSteps; i++) {
-      const val = Math.round(cfg.original - (range * i) / downSteps);
-      steps.push([t, val]);
-      t += 75 + i * 8;
-    }
-    t += 150;
-    for (let i = 1; i <= upSteps; i++) {
-      const val = Math.round(cfg.demo + (range * i) / upSteps);
-      steps.push([t, val]);
-      t += 65 + (upSteps - i) * 6;
-    }
+      const steps: [number, number][] = [];
+      const range = cfg.original - cfg.demo;
+      const downSteps = 4;
+      const upSteps = 5;
+      let t = 200;
 
-    steps.forEach(([delay, val], i) => {
+      for (let i = 1; i <= downSteps; i++) {
+        const val = Math.round(cfg.original - (range * i) / downSteps);
+        steps.push([t, val]);
+        t += 75 + i * 8;
+      }
+      t += 150;
+      for (let i = 1; i <= upSteps; i++) {
+        const val = Math.round(cfg.demo + (range * i) / upSteps);
+        steps.push([t, val]);
+        t += 65 + (upSteps - i) * 6;
+      }
+
+      steps.forEach(([delay, val], i) => {
+        calibrationRef.current.push(
+          setTimeout(() => {
+            valueRef.current = val;
+            setValue(val);
+            setIsNudging(true);
+            setActiveKey(i < downSteps ? "down" : "up");
+            if (f.sound) playTick();
+            clearTimeout(nudgeTimeoutRef.current);
+          }, delay),
+          setTimeout(() => {
+            setActiveKey(null);
+          }, delay + 60),
+        );
+      });
+
       calibrationRef.current.push(
         setTimeout(() => {
-          valueRef.current = val;
-          setValue(val);
-          setIsNudging(true);
-          setActiveKey(i < downSteps ? "down" : "up");
-          if (f.sound) playTick();
-          clearTimeout(nudgeTimeoutRef.current);
-        }, delay),
-        setTimeout(() => {
-          setActiveKey(null);
-        }, delay + 60),
+          setIsNudging(false);
+        }, t + 300),
       );
-    });
-
-    calibrationRef.current.push(
-      setTimeout(() => {
-        setIsNudging(false);
-      }, t + 300),
-    );
+    } else {
+      setIsNudging(false);
+    }
   }, [f.sound]);
 
   const cancelCalibration = useCallback(() => {
