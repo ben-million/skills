@@ -10,6 +10,57 @@ const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
 const ORIGINAL = 61;
 
+// ---------------------------------------------------------------------------
+// Audio — subtle haptic tick via Web Audio API
+// ---------------------------------------------------------------------------
+
+let audioCtx: AudioContext | null = null;
+let lastTickTime = 0;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function scheduleTick(time: number, volume: number, freq: number) {
+  const ctx = getAudioCtx();
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(freq, time);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.7, time + 0.003);
+
+  gain.gain.setValueAtTime(volume, time);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.005);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(time);
+  osc.stop(time + 0.008);
+}
+
+function playTick(held = false) {
+  const now = performance.now();
+  if (held && now - lastTickTime < 50) return;
+  lastTickTime = now;
+
+  const ctx = getAudioCtx();
+  scheduleTick(ctx.currentTime, held ? 0.012 : 0.03, held ? 1100 : 1300);
+}
+
+function playScrollTicks(count: number) {
+  if (count <= 0) return;
+  const ctx = getAudioCtx();
+
+  for (let i = 0; i < count; i++) {
+    scheduleTick(ctx.currentTime + i * 0.02, 0.02, 1200);
+  }
+}
+
 function Arrow({
   active,
   down,
@@ -73,7 +124,7 @@ export function BudgeMePaperPreview() {
     }
   }, []);
 
-  const step = useCallback((direction: number, shift = false) => {
+  const step = useCallback((direction: number, shift = false, held = false) => {
     const mult = shift ? 10 : 1;
     const next = valueRef.current + direction * mult;
     if (next > 86 || next < 32) {
@@ -83,8 +134,15 @@ export function BudgeMePaperPreview() {
       return;
     }
     setShaking(false);
+    const prev = valueRef.current;
     valueRef.current = next;
     setValue(valueRef.current);
+    const tensChanged = Math.floor(prev / 10) !== Math.floor(next / 10);
+    if (tensChanged && !held) {
+      playScrollTicks(2);
+    } else {
+      playTick(held);
+    }
   }, []);
 
   const triggerNudge = useCallback(
@@ -97,6 +155,7 @@ export function BudgeMePaperPreview() {
   );
 
   const reset = useCallback(() => {
+    const prev = valueRef.current;
     valueRef.current = ORIGINAL;
     setValue(ORIGINAL);
     setIsNudging(true);
@@ -104,6 +163,11 @@ export function BudgeMePaperPreview() {
     clearTimeout(nudgeTimeoutRef.current);
     nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
     setTimeout(() => setPressedButton(null), 70);
+    if (Math.floor(prev / 10) !== Math.floor(ORIGINAL / 10)) {
+      playScrollTicks(2);
+    } else {
+      playTick();
+    }
   }, []);
 
   const copy = useCallback(() => {
@@ -124,14 +188,14 @@ export function BudgeMePaperPreview() {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        step(1, e.shiftKey);
+        step(1, e.shiftKey, e.repeat);
         setActiveKey("up");
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
         nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        step(-1, e.shiftKey);
+        step(-1, e.shiftKey, e.repeat);
         setActiveKey("down");
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
