@@ -260,13 +260,14 @@ const ALL_FEATURES: PreviewFeatures = {
   showText: true,
 };
 
-export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?: PreviewFeatures } = {}) {
+export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: { features?: PreviewFeatures; autoFocus?: boolean } = {}) {
   const [value, setValue] = useState(ORIGINAL);
   const [typedRaw, setTypedRaw] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [shaking, setShaking] = useState(false);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -286,11 +287,15 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     }
   }, []);
 
+  useEffect(() => {
+    if (autoFocus) containerRef.current?.focus();
+  }, [autoFocus]);
+
   const [slide, setSlide] = useState(0);
   const s = SLIDES[slide];
 
   const goToSlide = useCallback((index: number) => {
-    if (index < 0 || index >= SLIDES.length) return;
+    index = ((index % SLIDES.length) + SLIDES.length) % SLIDES.length;
     calibrationRef.current.forEach(clearTimeout);
     calibrationRef.current = [];
     setSlide(index);
@@ -503,9 +508,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
         copy();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
+        if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); }
         goToSlide(slide - 1);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
+        if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); }
         goToSlide(slide + 1);
       }
     }
@@ -516,11 +523,13 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
       }
     }
 
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("keyup", onKeyUp);
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("keydown", onKeyDown);
+    el.addEventListener("keyup", onKeyUp);
     return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("keyup", onKeyUp);
+      el.removeEventListener("keydown", onKeyDown);
+      el.removeEventListener("keyup", onKeyUp);
       clearTimeout(nudgeTimeoutRef.current);
     };
   }, [step, reset, copy, goToSlide, slide, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, f.sound, s.min, s.max]);
@@ -547,7 +556,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     "opacity 0.15s ease";
 
   return (
-    <div className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4">
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      onPointerDown={() => containerRef.current?.focus()}
+      className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
       <div className={`flex flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
           <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] pt-3.5 self-center uppercase">
@@ -718,15 +731,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
           <div
             onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide - 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
-            style={{
-              visibility: slide === 0 ? "hidden" : "visible",
-              ...(f.buttonFeedback ? {
-                transform: pressedButton === "prev" ? "scale(0.9)" : "scale(1)",
-                transition: pressedButton === "prev"
-                  ? "transform 0.03s linear"
-                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-              } : {}),
-            }}
+            style={f.buttonFeedback ? {
+              transform: pressedButton === "prev" ? "translateX(-2px) scale(0.9)" : "translateX(0) scale(1)",
+              transition: pressedButton === "prev"
+                ? "transform 0.05s cubic-bezier(0.2, 0, 0, 1.6)"
+                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+            } : undefined}
           >
             <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px', flexShrink: 0 }}>
               <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" />
@@ -773,15 +783,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
           <div
             onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide + 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
-            style={{
-              visibility: slide === SLIDES.length - 1 ? "hidden" : "visible",
-              ...(f.buttonFeedback ? {
-                transform: pressedButton === "next" ? "scale(0.9)" : "scale(1)",
-                transition: pressedButton === "next"
-                  ? "transform 0.03s linear"
-                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-              } : {}),
-            }}
+            style={f.buttonFeedback ? {
+              transform: pressedButton === "next" ? "translateX(2px) scale(0.9)" : "translateX(0) scale(1)",
+              transition: pressedButton === "next"
+                ? "transform 0.05s cubic-bezier(0.2, 0, 0, 1.6)"
+                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+            } : undefined}
           >
             <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '20px', height: '20px', flexShrink: 0, transformOrigin: '50% 50%' }}>
               <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" style={{ transformOrigin: '50% 50%' }} />

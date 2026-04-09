@@ -74,6 +74,23 @@ const STAGE_8: PreviewFeatures = {
   numberInput: true,
 };
 
+const STAGE_SLIDES: PreviewFeatures = {
+  keyboard: true,
+  expandValue: true,
+  animatedDigits: true,
+  arrowBounce: true,
+  barPhysics: true,
+  idleOpacity: true,
+  boundaryShake: true,
+  buttonFeedback: true,
+  shiftStep: true,
+  numberInput: true,
+  sound: true,
+  showLabel: true,
+  showButtons: true,
+  showText: true,
+};
+
 export default function BuildingThePreviewPage() {
   return (
     <div className="[font-synthesis:none] overflow-x-clip antialiased min-h-screen bg-white flex flex-col items-center">
@@ -126,10 +143,12 @@ export default function BuildingThePreviewPage() {
               <P>
                 Three things happen at once. The arrows bounce — 1.5px up and
                 1.05× scale on press (100ms, overshoot curve), slower ease back
-                on release. The fill flashes white for 50ms. The entire bar
-                translates ±1.5px in the arrow direction and scales between
-                0.92× idle, 1× active, and 1.02× on confirm. Press-in is 60ms;
-                the return is a 350ms spring with overshoot.
+                on release. The fill flashes white for 50ms. The bar scales
+                between 0.8× idle, 1× active, and 1.02× on confirm. Scaling up
+                uses a 250ms spring with overshoot{" "}
+                <Code>cubic-bezier(0.34, 1.56, 0.64, 1)</Code>; scaling back
+                down is a slower 500ms ease-out with no bounce, so it pops into
+                action and settles gently.
               </P>
               <P>
                 At idle the bar fades to 80% opacity. It snaps back to 100%
@@ -143,9 +162,11 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Boundaries">
               <P>
-                Try going past 86px or below 32px. The bar shakes — a CSS
+                Try going past the max or below the min. The bar shakes — a CSS
                 keyframe that loops at ±2px every 150ms. It plays continuously
-                while the key is held.
+                while the key is held. Each slide defines its own range (e.g.
+                32–86 for font size, 0–100 for opacity, 0–48 for padding,
+                0–360 for color), and the boundary logic adapts automatically.
               </P>
               <P>
                 While the bar shakes, the arrow that caused it drops to the
@@ -206,17 +227,19 @@ export default function BuildingThePreviewPage() {
                 it and the raw string is shown immediately as{" "}
                 <Code>typedRaw</Code> — so pressing <Code>4</Code> shows{" "}
                 &ldquo;4px&rdquo; even though 4 is out of range. If the
-                accumulated number falls within 32–86, the underlying value
-                updates live on every keystroke. If not, the display still
-                reflects what you&apos;ve typed, but the bar doesn&apos;t move.
+                accumulated number falls within the slide&apos;s range, the
+                underlying value updates live on every keystroke. If not, the
+                display still reflects what you&apos;ve typed but turns gray
+                immediately to signal it&apos;s out of bounds — and the bar
+                doesn&apos;t move.
               </P>
               <P>
                 After 500ms of no further digits, the buffer commits. This
                 window is long enough to comfortably type two digits but short
                 enough that the UI doesn&apos;t feel sluggish. If the final
-                number is out of range — say you typed &ldquo;99&rdquo; — it
-                clamps to the nearest boundary (86), triggers the shake, and
-                plays the alert sound. Valid numbers just settle in silently.
+                number is out of range it clamps to the nearest boundary,
+                triggers the shake, and plays the alert sound. Valid numbers
+                just settle in silently.
               </P>
               <P>
                 A subtle detail: each digit press plays a tick and expands the
@@ -239,6 +262,60 @@ export default function BuildingThePreviewPage() {
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_8} />
+              </Demo>
+            </Section>
+
+            <Section title="Slide design">
+              <P>
+                A single demo only shows one property. To present the range of
+                what nudge can control, the preview cycles through four slides:
+                font size, opacity, padding, and color. Left/right chevron
+                buttons navigate between them, as do the arrow keys.
+              </P>
+              <P>
+                Each slide is defined as a config object — label, min, max,
+                original value, unit, and a demo target for the calibration
+                animation. The entire component reads from this config: boundary
+                checks, value display, copy prompt, and the text effect all
+                adapt automatically. Adding a new slide is a single line.
+              </P>
+              <P>
+                When you land on a new slide, a calibration sequence plays. It
+                mimics real usage — four ticks stepping down to the demo value,
+                a brief pause, then five ticks stepping back up. Each tick
+                fires an arrow bounce and a sound. The pacing decelerates on
+                the way down and accelerates on the way back, like someone
+                exploring then correcting. The bar starts at full scale
+                immediately so there&apos;s no awkward idle shrink before the
+                first tick.
+              </P>
+              <P>
+                The calibration can be interrupted. Any user interaction — a key
+                press, a click, a digit — cancels the remaining timeouts and
+                hands control back instantly. This prevents the demo from
+                fighting the user.
+              </P>
+              <P>
+                Each slide has its own visual treatment. Font size changes the{" "}
+                <Code>font-size</Code> of the text. Opacity fades it. Padding
+                wraps the text in a container with blue dashed guidelines and a
+                tinted background showing the padding area — negative vertical
+                margins cancel out the growth so the nudge bar stays in place.
+                Color shifts the text hue across 360° and, instead of showing
+                a numeric readout, flashes the arrows in the target color when
+                active.
+              </P>
+              <P>
+                The navigation buttons match the rest of the control&apos;s
+                design language: same pill shape, same box shadow, same press
+                feedback (0.9× scale, 30ms in). The left button hides on the
+                first slide and the right button hides on the last using{" "}
+                <Code>visibility: hidden</Code> so the layout doesn&apos;t
+                shift. A small uppercase label at the top center identifies the
+                current property.
+              </P>
+              <Demo>
+                <BudgeMePaperPreview features={STAGE_SLIDES} />
               </Demo>
             </Section>
           </div>

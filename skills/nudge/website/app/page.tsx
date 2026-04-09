@@ -130,7 +130,7 @@ export default function HomePage() {
         </div>
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0 pb-16">
           <div className="[font-synthesis:none] flex w-full min-w-0 h-fit flex-col gap-4.25 antialiased mt-14">
-            <BudgeMePaperPreview />
+            <BudgeMePaperPreview autoFocus />
           </div>
         </div>
       </div>
