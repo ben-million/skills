@@ -24,6 +24,7 @@ function getAudioCtx() {
 }
 
 let tickBuffer: AudioBuffer | null = null;
+let lastAlertTime = 0;
 
 function getTickBuffer(ctx: AudioContext) {
   if (tickBuffer && tickBuffer.sampleRate === ctx.sampleRate) return tickBuffer;
@@ -69,53 +70,50 @@ function scheduleTick(time: number, volume: number) {
   src.start(time);
 }
 
+let confirmBuffer: AudioBuffer | null = null;
+
+function getConfirmBuffer(ctx: AudioContext) {
+  if (confirmBuffer && confirmBuffer.sampleRate === ctx.sampleRate) return confirmBuffer;
+  const sr = ctx.sampleRate;
+  const dur = 0.025;
+  const len = Math.ceil(sr * dur);
+  const buf = ctx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+
+  let seed = 13;
+  function noise() {
+    seed = (seed * 16807 + 0) % 2147483647;
+    return (seed / 2147483647) * 2 - 1;
+  }
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+
+    // Heavy strike — broader, weightier than the tick
+    const strike = noise() * Math.exp(-t * 12000);
+    // Low bolt — the latch engaging
+    const bolt = Math.sin(2 * Math.PI * 1400 * t) * Math.exp(-t * 800);
+    // Metallic catch — brief ring at the end
+    const catch_ = Math.sin(2 * Math.PI * 3800 * t) * Math.exp(-t * 1200);
+    // Body resonance
+    const body = Math.sin(2 * Math.PI * 600 * t) * Math.exp(-t * 1500);
+
+    d[i] = 0.2 * strike + 0.3 * bolt + 0.2 * catch_ + 0.3 * body;
+  }
+
+  confirmBuffer = buf;
+  return buf;
+}
+
 function playConfirm() {
   const ctx = getAudioCtx();
-  const t = ctx.currentTime;
-
-  // Heavy thock — low impact
-  const thock = ctx.createOscillator();
-  const thockGain = ctx.createGain();
-  thock.type = "sine";
-  thock.frequency.setValueAtTime(350, t);
-  thock.frequency.exponentialRampToValueAtTime(80, t + 0.015);
-  thockGain.gain.setValueAtTime(0.35, t);
-  thockGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
-  thock.connect(thockGain);
-  thockGain.connect(ctx.destination);
-  thock.start(t);
-  thock.stop(t + 0.03);
-
-  // Click transient — filtered noise burst
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.008, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource();
-  noise.buffer = buf;
-  const bp = ctx.createBiquadFilter();
-  bp.type = "bandpass";
-  bp.frequency.value = 3500;
-  bp.Q.value = 1.5;
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.18, t);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.006);
-  noise.connect(bp);
-  bp.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noise.start(t);
-
-  // Latch settle — secondary lighter click
-  const latch = ctx.createOscillator();
-  const latchGain = ctx.createGain();
-  latch.type = "sine";
-  latch.frequency.setValueAtTime(600, t + 0.04);
-  latch.frequency.exponentialRampToValueAtTime(250, t + 0.05);
-  latchGain.gain.setValueAtTime(0.15, t + 0.04);
-  latchGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
-  latch.connect(latchGain);
-  latchGain.connect(ctx.destination);
-  latch.start(t + 0.04);
-  latch.stop(t + 0.06);
+  const src = ctx.createBufferSource();
+  src.buffer = getConfirmBuffer(ctx);
+  const gain = ctx.createGain();
+  gain.gain.value = 0.3;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(ctx.currentTime);
 }
 
 function playTick(held = false) {
@@ -125,6 +123,46 @@ function playTick(held = false) {
 
   const ctx = getAudioCtx();
   scheduleTick(ctx.currentTime, held ? 0.12 : 0.25);
+}
+
+function playAlert() {
+  const now = performance.now();
+  if (now - lastAlertTime < 400) return;
+  lastAlertTime = now;
+
+  const ctx = getAudioCtx();
+  const t = ctx.currentTime;
+
+  function bonk(freq: number, start: number, dur: number, vol: number) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, start);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.82, start + dur);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(vol, start + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + dur + 0.01);
+
+    // Overtone for woody timbre
+    const h = ctx.createOscillator();
+    const hg = ctx.createGain();
+    h.type = "sine";
+    h.frequency.setValueAtTime(freq * 3.2, start);
+    h.frequency.exponentialRampToValueAtTime(freq * 2.6, start + dur);
+    hg.gain.setValueAtTime(vol * 0.15, start);
+    hg.gain.exponentialRampToValueAtTime(0.0001, start + dur * 0.6);
+    h.connect(hg);
+    hg.connect(ctx.destination);
+    h.start(start);
+    h.stop(start + dur + 0.01);
+  }
+
+  bonk(490, t, 0.08, 0.12);
+  bonk(370, t + 0.06, 0.1, 0.1);
 }
 
 function playDoubleTick() {
@@ -203,6 +241,7 @@ export function BudgeMePaperPreview() {
       setShaking(true);
       clearTimeout(shakeTimeoutRef.current);
       shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
+      playAlert();
       return;
     }
     setShaking(false);
