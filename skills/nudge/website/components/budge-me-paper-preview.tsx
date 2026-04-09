@@ -427,11 +427,12 @@ export function BudgeMePaperPreview() {
             WebkitFontSmoothing: "antialiased",
             userSelect: "none",
             transform: `translateY(${nudgeY}px) scale(${baseScale})`,
+            opacity: isNudging || confirmed ? 1 : 0.8,
             transition: confirmed
-              ? "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)"
+              ? "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease"
               : activeKey
-                ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4)"
-                : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+                ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4), opacity 0.1s ease"
+                : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease 0.1s",
             animation: shaking
               ? "__nudge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
               : "none",
