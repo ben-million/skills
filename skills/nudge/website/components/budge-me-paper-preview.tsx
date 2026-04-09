@@ -91,9 +91,6 @@ export function BudgeMePaperPreview() {
     (dir: "up" | "down") => {
       step(dir === "up" ? 1 : -1);
       setActiveKey(dir);
-      setIsNudging(true);
-      clearTimeout(nudgeTimeoutRef.current);
-      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       setTimeout(() => setActiveKey(null), 100);
     },
     [step],
