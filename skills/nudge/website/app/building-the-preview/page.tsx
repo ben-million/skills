@@ -165,7 +165,7 @@ export default function BuildingThePreviewPage() {
                 Try going past the max or below the min. The bar shakes — a CSS
                 keyframe that loops at ±2px every 150ms. It plays continuously
                 while the key is held. Each slide defines its own range (e.g.
-                32–86 for font size, 0–100 for opacity, 0–48 for padding,
+                32–86 for font size, 0–100 for opacity, 0–48 for padding, and
                 0–360 for color), and the boundary logic adapts automatically.
               </P>
               <P>
@@ -242,11 +242,12 @@ export default function BuildingThePreviewPage() {
                 just settle in silently.
               </P>
               <P>
-                A subtle detail: each digit press plays a tick and expands the
-                readout, so you get the same tactile feedback as arrow nudging.
-                The readout shows the raw typed string rather than the clamped
-                value, so you see exactly what you entered before the system
-                corrects it.
+                Input is capped at three digits — enough for any value in the
+                current slides but short enough to prevent runaway typing.
+                Each digit press plays a tick and expands the readout, so you
+                get the same tactile feedback as arrow nudging. The readout
+                shows the raw typed string rather than the clamped value, so
+                you see exactly what you entered before the system corrects it.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_7} />
@@ -308,15 +309,37 @@ export default function BuildingThePreviewPage() {
               <P>
                 The navigation buttons match the rest of the control&apos;s
                 design language: same pill shape, same box shadow, same press
-                feedback (0.9× scale, 30ms in). The left button hides on the
-                first slide and the right button hides on the last using{" "}
-                <Code>visibility: hidden</Code> so the layout doesn&apos;t
-                shift. A small uppercase label at the top center identifies the
-                current property.
+                feedback (0.9× scale, 30ms in). Instead of hiding at the
+                boundaries, the slides loop — going past the last wraps to the
+                first and vice versa. On press, each chevron nudges 2px in its
+                direction with an overshoot curve{" "}
+                <Code>cubic-bezier(0.2, 0, 0, 1.6)</Code>, mirroring the
+                vertical bounce the nudge arrows use. This works on both click
+                and left/right arrow keys. A small uppercase label at the top
+                center identifies the current property.
               </P>
-              <Demo>
+              <div className="mt-6">
                 <BudgeMePaperPreview features={STAGE_SLIDES} />
-              </Demo>
+              </div>
+            </Section>
+
+            <Section title="The prompt">
+              <P>
+                Pressing Copy writes a prompt like{" "}
+                <Code>Set font-size to 48px</Code> to the clipboard and
+                immediately displays it below the preview. The prompt stays
+                visible and updates live as you continue nudging — the value
+                portion uses Calligraph slots so the digits roll in place
+                rather than swapping. For the color slide, only the hue number
+                animates; the surrounding{" "}
+                <Code>hsl(…, 70%, 55%)</Code> stays static to avoid
+                unnecessary slot churn.
+              </P>
+              <P>
+                Switching slides clears the prompt entirely. The idea is that
+                the prompt represents your current intent — once you move on,
+                it&apos;s gone.
+              </P>
             </Section>
           </div>
         </div>
@@ -343,7 +366,7 @@ function Section({
 }
 
 function Demo({ children }: { children: React.ReactNode }) {
-  return <div className="mt-6">{children}</div>;
+  return <div className="mt-6 flex justify-center">{children}</div>;
 }
 
 function P({ children }: { children: React.ReactNode }) {

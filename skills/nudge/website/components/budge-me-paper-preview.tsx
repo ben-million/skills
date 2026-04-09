@@ -12,7 +12,7 @@ const ORIGINAL = 61;
 
 const SLIDES = [
   { label: "font size", min: 32, max: 86, original: 61, unit: "px", demo: 48 },
-  { label: "opacity", min: 0, max: 100, original: 50, unit: "%", demo: 30 },
+  { label: "opacity", min: 0, max: 100, original: 100, unit: "%", demo: 20 },
   { label: "padding", min: 0, max: 48, original: 16, unit: "px", demo: 6 },
   { label: "color", min: 0, max: 360, original: 220, unit: "°", demo: 160 },
 ];
@@ -266,6 +266,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -306,6 +307,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     setIsNudging(true);
     setShaking(false);
     setConfirmed(false);
+    setShowPrompt(false);
     setActiveKey(null);
     digitBufferRef.current = "";
     clearTimeout(digitTimeoutRef.current);
@@ -431,6 +433,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     const val = slide === 3 ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${s.unit}`;
     const prompt = `Set \`${prop}\` to \`${val}\``;
     navigator.clipboard?.writeText(prompt);
+    setShowPrompt(true);
     setConfirmed(true);
     setIsNudging(true);
     if (f.buttonFeedback) setPressedButton("copy");
@@ -467,6 +470,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         }
       } else if (f.numberInput && e.key >= "0" && e.key <= "9") {
         e.preventDefault();
+        if (digitBufferRef.current.length >= 3) return;
         digitBufferRef.current += e.key;
         const num = parseInt(digitBufferRef.current, 10);
         if (!isNaN(num)) {
@@ -556,6 +560,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     "opacity 0.15s ease";
 
   return (
+    <>
     <div
       ref={containerRef}
       tabIndex={0}
@@ -738,7 +743,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
             } : undefined}
           >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px', flexShrink: 0 }}>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px', flexShrink: 0, marginLeft: '-1.5px' }}>
               <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" />
             </svg>
           </div>
@@ -746,7 +751,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             <button
               type="button"
               onClick={reset}
-              className="cursor-pointer flex items-center justify-center w-24.5 h-8 rounded-full gap-5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+              className="cursor-pointer flex items-center justify-center px-4 h-8 rounded-full gap-1.5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
               style={f.buttonFeedback ? {
                 transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
                 transition: pressedButton === "reset"
@@ -764,7 +769,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             <button
               type="button"
               onClick={copy}
-              className="cursor-pointer flex items-center justify-center w-24.5 h-8 rounded-full gap-5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+              className="cursor-pointer flex items-center justify-center px-4 h-8 rounded-full gap-1.5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
               style={f.buttonFeedback ? {
                 transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
                 transition: pressedButton === "copy"
@@ -790,12 +795,63 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
             } : undefined}
           >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '20px', height: '20px', flexShrink: 0, transformOrigin: '50% 50%' }}>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '20px', height: '20px', flexShrink: 0, transformOrigin: '50% 50%', marginRight: '-1.5px' }}>
               <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" style={{ transformOrigin: '50% 50%' }} />
             </svg>
           </div>
         </div>
       )}
     </div>
+    {showPrompt && (
+      <div
+        style={{
+          marginTop: 16,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontSize: 13.5,
+          lineHeight: "20px",
+          color: "#6B6B6B",
+          textAlign: "center",
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "center",
+          gap: "0.35em",
+        }}
+      >
+        <span>Set {["font-size", "opacity", "padding", "color"][slide]} to </span>
+        {slide === 3 ? (
+          <span>
+            hsl(<Calligraph
+              variant="slots"
+              animation="snappy"
+              style={{
+                fontFamily: "inherit",
+                fontSize: "inherit",
+                lineHeight: "inherit",
+                color: "inherit",
+                fontVariantNumeric: "tabular-nums",
+                display: "inline-flex",
+              }}
+            >
+              {`${value}`}
+            </Calligraph>, 70%, 55%)
+          </span>
+        ) : (
+          <Calligraph
+            variant="slots"
+            animation="snappy"
+            style={{
+              fontFamily: "inherit",
+              fontSize: "inherit",
+              lineHeight: "inherit",
+              color: "inherit",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {`${value}${s.unit}`}
+          </Calligraph>
+        )}
+      </div>
+    )}
+    </>
   );
 }
