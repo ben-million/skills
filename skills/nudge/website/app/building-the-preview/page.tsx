@@ -13,10 +13,13 @@ const STAGE_2: PreviewFeatures = { ...BLOG, keyboard: true };
 
 const STAGE_3: PreviewFeatures = { ...BLOG, keyboard: true, expandValue: true };
 
+const STAGE_3B: PreviewFeatures = { ...BLOG, keyboard: true, expandValue: true, animatedDigits: true };
+
 const STAGE_4: PreviewFeatures = {
   ...BLOG,
   keyboard: true,
   expandValue: true,
+  animatedDigits: true,
   arrowBounce: true,
   barPhysics: true,
   idleOpacity: true,
@@ -26,6 +29,7 @@ const STAGE_5: PreviewFeatures = {
   ...BLOG,
   keyboard: true,
   expandValue: true,
+  animatedDigits: true,
   arrowBounce: true,
   barPhysics: true,
   idleOpacity: true,
@@ -36,6 +40,7 @@ const STAGE_6: PreviewFeatures = {
   ...BLOG,
   keyboard: true,
   expandValue: true,
+  animatedDigits: true,
   arrowBounce: true,
   barPhysics: true,
   idleOpacity: true,
@@ -47,6 +52,19 @@ const STAGE_7: PreviewFeatures = {
   ...BLOG,
   keyboard: true,
   expandValue: true,
+  animatedDigits: true,
+  arrowBounce: true,
+  barPhysics: true,
+  idleOpacity: true,
+  boundaryShake: true,
+  numberInput: true,
+};
+
+const STAGE_8: PreviewFeatures = {
+  ...BLOG,
+  keyboard: true,
+  expandValue: true,
+  animatedDigits: true,
   arrowBounce: true,
   barPhysics: true,
   idleOpacity: true,
@@ -68,14 +86,7 @@ export default function BuildingThePreviewPage() {
             &larr; back
           </a>
 
-          <div className="mt-10 mb-1 left-0 top-0 w-full min-w-0 [white-space-collapse:preserve] relative text-[#3F3F3F] font-semibold text-[18px]/5.75">
-            Building the budge preview
-          </div>
-          <div className="[letter-spacing:0em] [white-space-collapse:preserve] mt-[17px] mb-6 font-medium text-[15px]/[22px] text-[#999]">
-            A breakdown of every design decision in the interactive demo, introduced one layer at a time.
-          </div>
-
-          <div className="flex flex-col gap-24 mt-8">
+          <div className="flex flex-col gap-24 mt-10">
             <Section title="The value readout">
               <P>
                 When you press an arrow key, the value display slides in from
@@ -93,6 +104,21 @@ export default function BuildingThePreviewPage() {
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_3} />
+              </Demo>
+            </Section>
+
+            <Section title="Animated digits">
+              <P>
+                The plain text readout works, but the digits just swap
+                instantly — there&apos;s no sense of movement. Wrapping the
+                value in Calligraph with <Code>variant=&ldquo;slots&rdquo;</Code>{" "}
+                and <Code>animation=&ldquo;snappy&rdquo;</Code> gives each
+                digit its own slot that rolls up or down when the number
+                changes. It turns a static label into something that feels
+                mechanically connected to the arrows.
+              </P>
+              <Demo>
+                <BudgeMePaperPreview features={STAGE_3B} />
               </Demo>
             </Section>
 
@@ -168,16 +194,51 @@ export default function BuildingThePreviewPage() {
               </Demo>
             </Section>
 
-            <Section title="Everything else">
+            <Section title="Number input">
               <P>
-                The final layer adds button press feedback (0.975× scale, 30ms
-                in, 70ms hold), Shift+Arrow for 10× stepping, and direct number
-                input — type &ldquo;42&rdquo; and the display updates instantly
-                on each digit. Out-of-range numbers trigger the shake and clamp
-                to the nearest boundary after a 500ms buffer timeout.
+                Arrow keys are fine for small adjustments, but jumping from 61
+                to 42 one tick at a time is painful. Typing digits solves this —
+                press <Code>4</Code> then <Code>2</Code> and the value lands
+                instantly.
+              </P>
+              <P>
+                The implementation uses a digit buffer. Each keypress appends to
+                it and the raw string is shown immediately as{" "}
+                <Code>typedRaw</Code> — so pressing <Code>4</Code> shows{" "}
+                &ldquo;4px&rdquo; even though 4 is out of range. If the
+                accumulated number falls within 32–86, the underlying value
+                updates live on every keystroke. If not, the display still
+                reflects what you&apos;ve typed, but the bar doesn&apos;t move.
+              </P>
+              <P>
+                After 500ms of no further digits, the buffer commits. This
+                window is long enough to comfortably type two digits but short
+                enough that the UI doesn&apos;t feel sluggish. If the final
+                number is out of range — say you typed &ldquo;99&rdquo; — it
+                clamps to the nearest boundary (86), triggers the shake, and
+                plays the alert sound. Valid numbers just settle in silently.
+              </P>
+              <P>
+                A subtle detail: each digit press plays a tick and expands the
+                readout, so you get the same tactile feedback as arrow nudging.
+                The readout shows the raw typed string rather than the clamped
+                value, so you see exactly what you entered before the system
+                corrects it.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_7} />
+              </Demo>
+            </Section>
+
+            <Section title="Everything else">
+              <P>
+                The final layer adds button press feedback — 0.975× scale on
+                press, 30ms in, 70ms hold — and Shift+Arrow for 10× stepping
+                to cover the remaining gap between single ticks and direct
+                number entry.
+              </P>
+              <Demo>
+                <BudgeMePaperPreview features={STAGE_8} />
               </Demo>
             </Section>
           </div>

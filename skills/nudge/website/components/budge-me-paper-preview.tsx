@@ -10,6 +10,11 @@ const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
 const ORIGINAL = 61;
 
+const SLIDES = [
+  { label: "font size", min: 32, max: 86, original: 61, unit: "px", demo: 48 },
+  { label: "opacity", min: 0, max: 100, original: 50, unit: "%", demo: 30 },
+];
+
 // ---------------------------------------------------------------------------
 // Audio — subtle haptic tick via Web Audio API
 // ---------------------------------------------------------------------------
@@ -220,6 +225,7 @@ function Arrow({
 export interface PreviewFeatures {
   keyboard?: boolean;
   expandValue?: boolean;
+  animatedDigits?: boolean;
   arrowBounce?: boolean;
   barPhysics?: boolean;
   boundaryShake?: boolean;
@@ -236,6 +242,7 @@ export interface PreviewFeatures {
 const ALL_FEATURES: PreviewFeatures = {
   keyboard: true,
   expandValue: true,
+  animatedDigits: true,
   arrowBounce: true,
   barPhysics: true,
   boundaryShake: true,
@@ -255,7 +262,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [pressedButton, setPressedButton] = useState<"reset" | "copy" | null>(null);
+  const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [shaking, setShaking] = useState(false);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -264,6 +271,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
   const digitBufferRef = useRef("");
   const digitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
+  const calibrationRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     if (!shakeInjected) {
@@ -274,12 +282,82 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     }
   }, []);
 
+  const [slide, setSlide] = useState(0);
+  const s = SLIDES[slide];
+
+  const goToSlide = useCallback((index: number) => {
+    if (index < 0 || index >= SLIDES.length) return;
+    calibrationRef.current.forEach(clearTimeout);
+    calibrationRef.current = [];
+    setSlide(index);
+    const cfg = SLIDES[index];
+    valueRef.current = cfg.original;
+    setValue(cfg.original);
+    setTypedRaw(null);
+    setIsNudging(false);
+    setShaking(false);
+    setConfirmed(false);
+    setActiveKey(null);
+    digitBufferRef.current = "";
+    clearTimeout(digitTimeoutRef.current);
+    clearTimeout(nudgeTimeoutRef.current);
+    clearTimeout(shakeTimeoutRef.current);
+    clearTimeout(confirmedTimeoutRef.current);
+
+    const steps: [number, number][] = [];
+    const range = cfg.original - cfg.demo;
+    const downSteps = 4;
+    const upSteps = 5;
+    let t = 200;
+
+    for (let i = 1; i <= downSteps; i++) {
+      const val = Math.round(cfg.original - (range * i) / downSteps);
+      steps.push([t, val]);
+      t += 75 + i * 8;
+    }
+    t += 150;
+    for (let i = 1; i <= upSteps; i++) {
+      const val = Math.round(cfg.demo + (range * i) / upSteps);
+      steps.push([t, val]);
+      t += 65 + (upSteps - i) * 6;
+    }
+
+    steps.forEach(([delay, val], i) => {
+      calibrationRef.current.push(
+        setTimeout(() => {
+          valueRef.current = val;
+          setValue(val);
+          setIsNudging(true);
+          setActiveKey(i < downSteps ? "down" : "up");
+          if (f.sound) playTick();
+          clearTimeout(nudgeTimeoutRef.current);
+        }, delay),
+        setTimeout(() => {
+          setActiveKey(null);
+        }, delay + 60),
+      );
+    });
+
+    calibrationRef.current.push(
+      setTimeout(() => {
+        setIsNudging(false);
+      }, t + 300),
+    );
+  }, [f.sound]);
+
+  const cancelCalibration = useCallback(() => {
+    if (calibrationRef.current.length === 0) return;
+    calibrationRef.current.forEach(clearTimeout);
+    calibrationRef.current = [];
+    setActiveKey(null);
+  }, []);
+
   const applyDigitBufferRef = useRef(() => {});
   applyDigitBufferRef.current = () => {
     const num = parseInt(digitBufferRef.current, 10);
     digitBufferRef.current = "";
     if (isNaN(num)) return;
-    const clamped = Math.min(86, Math.max(32, num));
+    const clamped = Math.min(s.max, Math.max(s.min, num));
     if (clamped !== valueRef.current) {
       valueRef.current = clamped;
       setValue(clamped);
@@ -291,9 +369,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
   };
 
   const step = useCallback((direction: number, shift = false, held = false) => {
+    cancelCalibration();
     const mult = (f.shiftStep && shift) ? 10 : 1;
     const next = valueRef.current + direction * mult;
-    if (next > 86 || next < 32) {
+    if (next > s.max || next < s.min) {
       if (f.boundaryShake) {
         setShaking(true);
         clearTimeout(shakeTimeoutRef.current);
@@ -306,7 +385,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     valueRef.current = next;
     setValue(valueRef.current);
     if (f.sound) playTick(held);
-  }, [f.shiftStep, f.boundaryShake, f.sound]);
+  }, [f.shiftStep, f.boundaryShake, f.sound, s.min, s.max, cancelCalibration]);
 
   const triggerNudge = useCallback(
     (dir: "up" | "down") => {
@@ -318,25 +397,29 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
   );
 
   const reset = useCallback(() => {
+    cancelCalibration();
     const prev = valueRef.current;
-    valueRef.current = ORIGINAL;
-    setValue(ORIGINAL);
+    valueRef.current = s.original;
+    setValue(s.original);
     setIsNudging(true);
     if (f.buttonFeedback) setPressedButton("reset");
     clearTimeout(nudgeTimeoutRef.current);
     nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
     if (f.sound) {
-      if (Math.floor(prev / 10) !== Math.floor(ORIGINAL / 10)) {
+      if (Math.floor(prev / 10) !== Math.floor(s.original / 10)) {
         playDoubleTick();
       } else {
         playTick();
       }
     }
-  }, [f.buttonFeedback, f.sound]);
+  }, [f.buttonFeedback, f.sound, s.original, cancelCalibration]);
 
   const copy = useCallback(() => {
-    const prompt = `Set \`font-size\` to \`${valueRef.current}px\``;
+    cancelCalibration();
+    const prop = slide === 0 ? "font-size" : "opacity";
+    const val = slide === 0 ? `${valueRef.current}px` : `${valueRef.current}%`;
+    const prompt = `Set \`${prop}\` to \`${val}\``;
     navigator.clipboard?.writeText(prompt);
     setConfirmed(true);
     setIsNudging(true);
@@ -348,7 +431,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
     }, 800);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
     if (f.sound) playConfirm();
-  }, [f.buttonFeedback, f.sound]);
+  }, [f.buttonFeedback, f.sound, slide, cancelCalibration]);
 
   useEffect(() => {
     if (!f.keyboard) return;
@@ -380,7 +463,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
           setTypedRaw(digitBufferRef.current);
           setIsNudging(true);
           if (f.sound) playTick();
-          if (num >= 32 && num <= 86) {
+          if (num >= s.min && num <= s.max) {
             valueRef.current = num;
             setValue(num);
           }
@@ -390,8 +473,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
         digitTimeoutRef.current = setTimeout(() => {
           const final = parseInt(digitBufferRef.current, 10);
           digitBufferRef.current = "";
-          if (!isNaN(final) && (final < 32 || final > 86)) {
-            const clamped = Math.min(86, Math.max(32, final));
+          if (!isNaN(final) && (final < s.min || final > s.max)) {
+            const clamped = Math.min(s.max, Math.max(s.min, final));
             valueRef.current = clamped;
             setValue(clamped);
             setTypedRaw(null);
@@ -413,6 +496,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
       } else if (e.key === "Enter") {
         e.preventDefault();
         copy();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goToSlide(slide - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goToSlide(slide + 1);
       }
     }
 
@@ -429,11 +518,15 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
       document.removeEventListener("keyup", onKeyUp);
       clearTimeout(nudgeTimeoutRef.current);
     };
-  }, [step, reset, copy, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, f.sound]);
+  }, [step, reset, copy, goToSlide, slide, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, f.sound, s.min, s.max]);
 
-  const displayValue = typedRaw !== null ? `${typedRaw}px` : `${value}px`;
-  const atMin = value <= 32;
-  const atMax = value >= 86;
+  const displayValue = typedRaw !== null ? `${typedRaw}${s.unit}` : `${value}${s.unit}`;
+  const typedOutOfRange = typedRaw !== null && (() => {
+    const n = parseInt(typedRaw, 10);
+    return !isNaN(n) && (n < s.min || n > s.max);
+  })();
+  const atMin = value <= s.min;
+  const atMax = value >= s.max;
   const nudgeY = f.barPhysics ? (activeKey === "down" ? 1.5 : activeKey === "up" ? -1.5 : 0) : 0;
   const baseScale = f.barPhysics ? (confirmed ? 1.02 : isNudging ? 1 : 0.92) : 1;
 
@@ -451,7 +544,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
       <div className={`flex flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
           <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#696969] pt-3.5 self-start pl-4">
-            font size
+{s.label}
           </div>
         )}
         {f.showText !== false && (
@@ -459,8 +552,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
             className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
             style={{
               fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
-              fontSize: `${value}px`,
-              transition: "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+              fontSize: slide === 0 ? `${value}px` : '61px',
+              opacity: slide === 1 ? value / 100 : 1,
+              transition: slide === 0
+                ? "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                : "opacity 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             budge me
@@ -523,24 +619,43 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
                   overflow: "visible",
                 }}
               >
-                <Calligraph
-                  variant="slots"
-                  animation="snappy"
-                  style={{
-                    color: shaking ? "#A7A7A7" : "#fff",
-                    fontFamily: FONT,
-                    fontWeight: 500,
-                    fontSize: 14.5,
-                    lineHeight: "22px",
-                    whiteSpace: "nowrap",
-                    fontVariantNumeric: "tabular-nums",
-                    minWidth: 48,
-                    textAlign: "left",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  {displayValue}
-                </Calligraph>
+{f.animatedDigits ? (
+                  <Calligraph
+                    variant="slots"
+                    animation="snappy"
+                    style={{
+                      color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
+                      fontFamily: FONT,
+                      fontWeight: 500,
+                      fontSize: 14.5,
+                      lineHeight: "22px",
+                      whiteSpace: "nowrap",
+                      fontVariantNumeric: "tabular-nums",
+                      minWidth: 48,
+                      textAlign: "left",
+                      transition: "color 0.2s ease",
+                    }}
+                  >
+                    {displayValue}
+                  </Calligraph>
+                ) : (
+                  <span
+                    style={{
+                      color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
+                      fontFamily: FONT,
+                      fontWeight: 500,
+                      fontSize: 14.5,
+                      lineHeight: "22px",
+                      whiteSpace: "nowrap",
+                      fontVariantNumeric: "tabular-nums",
+                      minWidth: 48,
+                      textAlign: "left",
+                      transition: "color 0.2s ease",
+                    }}
+                  >
+                    {displayValue}
+                  </span>
+                )}
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -562,43 +677,79 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES }: { features?:
       </div>
 
       {f.showButtons !== false && (
-        <div className="flex items-center justify-center h-17.25 shrink-0 gap-3.25 border-t border-solid border-t-[#EEEEEE]">
-          <button
-            type="button"
-            onClick={reset}
-            className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
-            style={f.buttonFeedback ? {
-              transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
-              transition: pressedButton === "reset"
-                ? "transform 0.03s linear"
-                : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-            } : undefined}
+        <div className="flex items-center justify-between h-17.25 shrink-0 px-4 border-t border-solid border-t-[#EEEEEE]">
+          <div
+            onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide - 1); }}
+            className="flex items-center justify-center rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+            style={{
+              visibility: slide === 0 ? "hidden" : "visible",
+              ...(f.buttonFeedback ? {
+                transform: pressedButton === "prev" ? "scale(0.9)" : "scale(1)",
+                transition: pressedButton === "prev"
+                  ? "transform 0.03s linear"
+                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : {}),
+            }}
           >
-            <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
-              Reset
-            </div>
-            <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
-              R
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={copy}
-            className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
-            style={f.buttonFeedback ? {
-              transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
-              transition: pressedButton === "copy"
-                ? "transform 0.03s linear"
-                : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-            } : undefined}
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '24.14px', height: '24.14px', flexShrink: 0 }}>
+              <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" />
+            </svg>
+          </div>
+          <div className="flex items-center gap-3.25">
+            <button
+              type="button"
+              onClick={reset}
+              className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+              style={f.buttonFeedback ? {
+                transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
+                transition: pressedButton === "reset"
+                  ? "transform 0.03s linear"
+                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : undefined}
+            >
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
+                Reset
+              </div>
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
+                R
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={copy}
+              className="cursor-pointer flex items-center justify-center w-27 h-9 rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
+              style={f.buttonFeedback ? {
+                transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
+                transition: pressedButton === "copy"
+                  ? "transform 0.03s linear"
+                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : undefined}
+            >
+              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
+                Copy
+              </div>
+              <div className="[letter-spacing:0px] w-max h-3.75 left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
+                ↵
+              </div>
+            </button>
+          </div>
+          <div
+            onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide + 1); }}
+            className="flex items-center justify-center rounded-full gap-6 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+            style={{
+              visibility: slide === SLIDES.length - 1 ? "hidden" : "visible",
+              ...(f.buttonFeedback ? {
+                transform: pressedButton === "next" ? "scale(0.9)" : "scale(1)",
+                transition: pressedButton === "next"
+                  ? "transform 0.03s linear"
+                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : {}),
+            }}
           >
-            <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[15px]/4.5">
-              Copy
-            </div>
-            <div className="[letter-spacing:0px] w-max h-3.75 left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[15px]/4.5">
-              ↵
-            </div>
-          </button>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '24.14px', height: 'auto', flexShrink: 0, transformOrigin: '50% 50%' }}>
+              <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" style={{ transformOrigin: '50% 50%' }} />
+            </svg>
+          </div>
         </div>
       )}
     </div>
