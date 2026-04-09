@@ -278,7 +278,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const digitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
   const calibrationRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const calibratedRef = useRef<Set<number>>(new Set());
+  const calibratedRef = useRef<Set<number>>(new Set([0]));
 
   useEffect(() => {
     if (!shakeInjected) {
@@ -511,7 +511,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             setIsNudging(false);
           }
         }, 500);
-      } else if (e.key === "r" || e.key === "R") {
+      } else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         reset();
       } else if (e.key === "Enter") {
@@ -739,7 +739,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       </div>
 
       {f.showButtons !== false && (
-        <div className="flex items-center justify-between h-15 shrink-0 px-3.5 border-t border-solid border-t-[#EEEEEE]">
+        <div className="flex items-center justify-between h-15 shrink-0 px-3.5">
           <div
             onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide - 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
