@@ -214,6 +214,7 @@ function Arrow({
 
 export function BudgeMePaperPreview() {
   const [value, setValue] = useState(ORIGINAL);
+  const [typedRaw, setTypedRaw] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -223,6 +224,8 @@ export function BudgeMePaperPreview() {
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const digitBufferRef = useRef("");
+  const digitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
 
   useEffect(() => {
@@ -233,6 +236,22 @@ export function BudgeMePaperPreview() {
       shakeInjected = true;
     }
   }, []);
+
+  const applyDigitBufferRef = useRef(() => {});
+  applyDigitBufferRef.current = () => {
+    const num = parseInt(digitBufferRef.current, 10);
+    digitBufferRef.current = "";
+    if (isNaN(num)) return;
+    const clamped = Math.min(86, Math.max(32, num));
+    if (clamped !== valueRef.current) {
+      valueRef.current = clamped;
+      setValue(clamped);
+      setIsNudging(true);
+      clearTimeout(nudgeTimeoutRef.current);
+      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+      playTick();
+    }
+  };
 
   const step = useCallback((direction: number, shift = false, held = false) => {
     const mult = shift ? 10 : 1;
@@ -306,6 +325,39 @@ export function BudgeMePaperPreview() {
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
         nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+      } else if (e.key >= "0" && e.key <= "9") {
+        e.preventDefault();
+        digitBufferRef.current += e.key;
+        const num = parseInt(digitBufferRef.current, 10);
+        if (!isNaN(num)) {
+          setTypedRaw(digitBufferRef.current);
+          setIsNudging(true);
+          playTick();
+          if (num >= 32 && num <= 86) {
+            valueRef.current = num;
+            setValue(num);
+          }
+        }
+        clearTimeout(digitTimeoutRef.current);
+        clearTimeout(nudgeTimeoutRef.current);
+        digitTimeoutRef.current = setTimeout(() => {
+          const final = parseInt(digitBufferRef.current, 10);
+          digitBufferRef.current = "";
+          if (!isNaN(final) && (final < 32 || final > 86)) {
+            const clamped = Math.min(86, Math.max(32, final));
+            valueRef.current = clamped;
+            setValue(clamped);
+            setTypedRaw(null);
+            setShaking(true);
+            clearTimeout(shakeTimeoutRef.current);
+            shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
+            playAlert();
+            nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+          } else {
+            setTypedRaw(null);
+            setIsNudging(false);
+          }
+        }, 500);
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
         reset();
@@ -330,7 +382,7 @@ export function BudgeMePaperPreview() {
     };
   }, [step, reset, copy]);
 
-  const displayValue = `${value}px`;
+  const displayValue = typedRaw !== null ? `${typedRaw}px` : `${value}px`;
   const nudgeY = activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0;
   const baseScale = confirmed ? 1.05 : isNudging ? 1 : 0.85;
 
