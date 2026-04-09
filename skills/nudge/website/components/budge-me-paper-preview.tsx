@@ -59,8 +59,9 @@ export function BudgeMePaperPreview() {
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
 
-  const step = useCallback((direction: number) => {
-    valueRef.current = Math.max(1, valueRef.current + direction);
+  const step = useCallback((direction: number, shift = false) => {
+    const mult = shift ? 10 : 1;
+    valueRef.current = Math.min(86, Math.max(32, valueRef.current + direction * mult));
     setValue(valueRef.current);
   }, []);
 
@@ -104,14 +105,14 @@ export function BudgeMePaperPreview() {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        step(1);
+        step(1, e.shiftKey);
         setActiveKey("up");
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
         nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        step(-1);
+        step(-1, e.shiftKey);
         setActiveKey("down");
         setIsNudging(true);
         clearTimeout(nudgeTimeoutRef.current);
@@ -155,12 +156,16 @@ export function BudgeMePaperPreview() {
 
   return (
     <div className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4">
-      <div className="flex flex-col items-center grow shrink basis-[0%] pt-14.75 gap-7">
+      <div className="flex flex-col items-center grow shrink basis-[0%] gap-7">
+        <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/[22px] text-[#696969] pt-3.5 self-start pl-4">
+          font size
+        </div>
         <div
           className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
           style={{
             fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
             fontSize: `${value}px`,
+            transition: "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
           budge me

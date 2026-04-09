@@ -44,8 +44,8 @@ export default function HomePage() {
           </div>
           <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/[22px] text-[#707070]">
             &ldquo;add space above X&rdquo; or &ldquo;make Y less subtle&rdquo; gets you 90% of the
-            way there. nudge is for the last 10; a tiny stepper appears on the page and you arrow-key
-            the value into place, like in your favourite design tool.
+            way there. budge is for the last 10; a tiny stepper appears on the page and you arrow-key
+            the value. Just like nudging in your favourite design tool.
           </div>
           {/**
            * from Paper
@@ -131,14 +131,6 @@ export default function HomePage() {
         </div>
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0">
           <div className="[font-synthesis:none] flex w-full min-w-0 h-fit flex-col gap-4.25 antialiased mt-14">
-            <div className="flex w-full min-w-0 flex-col">
-              <div className="mb-0 left-0 top-0 w-full min-w-0 [white-space-collapse:preserve] relative text-[#3F3F3F] font-['OpenRunde-Semibold','Open_Runde',system-ui,sans-serif] font-semibold text-[18px]/5.75">
-                font size
-              </div>
-              <div className="[letter-spacing:0em] [white-space-collapse:preserve] mt-[17px] font-['OpenRunde-Medium','Open_Runde',system-ui,sans-serif] font-medium text-[15px]/[22px] text-[#696969]">
-                use your arrow keys to budge the font px
-              </div>
-            </div>
             <BudgeMePaperPreview />
           </div>
         </div>
