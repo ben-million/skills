@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Calligraph } from "calligraph";
 
 const FONT = "'Open Runde', system-ui, sans-serif";
+const SHAKE_KEYFRAMES = `@keyframes __nudge-shake{0%,100%{translate:0}25%{translate:-2px}50%{translate:2px}75%{translate:-1px}}`;
+let shakeInjected = false;
 const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
 const ORIGINAL = 61;
@@ -55,13 +57,33 @@ export function BudgeMePaperPreview() {
   const [isNudging, setIsNudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [shaking, setShaking] = useState(false);
+  const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
 
+  useEffect(() => {
+    if (!shakeInjected) {
+      const style = document.createElement("style");
+      style.textContent = SHAKE_KEYFRAMES;
+      document.head.appendChild(style);
+      shakeInjected = true;
+    }
+  }, []);
+
   const step = useCallback((direction: number, shift = false) => {
     const mult = shift ? 10 : 1;
-    valueRef.current = Math.min(86, Math.max(32, valueRef.current + direction * mult));
+    const next = valueRef.current + direction * mult;
+    if (next > 86 || next < 32) {
+      setShaking(true);
+      clearTimeout(shakeTimeoutRef.current);
+      shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
+      return;
+    }
+    setShaking(false);
+    valueRef.current = next;
     setValue(valueRef.current);
   }, []);
 
@@ -172,6 +194,7 @@ export function BudgeMePaperPreview() {
         </div>
 
         <div
+          ref={barRef}
           style={{
             display: "flex",
             height: 37,
@@ -190,6 +213,9 @@ export function BudgeMePaperPreview() {
               : activeKey
                 ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.4)"
                 : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+            animation: shaking
+              ? "__nudge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
+              : "none",
           }}
         >
           {confirmed ? (

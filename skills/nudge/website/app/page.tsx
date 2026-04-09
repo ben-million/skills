@@ -128,47 +128,10 @@ export default function HomePage() {
                 </button>
           </div>
         </div>
-        <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0">
+        <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0 pb-16">
           <div className="[font-synthesis:none] flex w-full min-w-0 h-fit flex-col gap-4.25 antialiased mt-14">
             <BudgeMePaperPreview />
           </div>
-        </div>
-        <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0 pb-16">
-          {/**
-           * from Paper
-           * https://app.paper.design/file/01KNQ55X8XBA22KECV7GYDNFVK?node=2T-0
-           * on Apr 9, 2026
-           */}
-          <a
-            href="https://github.com/ben-million/skills/blob/main/skills/nudge/SKILL.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-[20px] block w-fit rounded-full outline-offset-2"
-          >
-            <div className="[font-synthesis:none] items-center flex justify-between w-fit rounded-full overflow-clip gap-0.5 py-2.5 px-4.25 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased">
-              <div className="items-center flex gap-1.25">
-                <svg
-                  width="1em"
-                  height="1em"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  style={{ width: "18px", height: "auto", flexShrink: "0" }}
-                  aria-hidden
-                >
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M4.081 2.543C2.895 2.447 2 3.419 2 4.5V16.5C2 17.632 2.906 18.439 3.887 18.549C6.041 18.792 7.452 19.898 8.27 20.802C8.775 21.36 9.498 21.33 9.916 21.197C10.328 21.065 11 20.641 11 19.806V7.623C11 7.466 10.982 7.273 10.913 7.067C10.775 6.655 10.351 5.625 9.299 4.64C8.233 3.642 6.578 2.745 4.081 2.543ZM22 4.496C22 3.418 21.099 2.425 19.889 2.562C15.784 3.024 13.766 5.933 13.257 6.783C13.069 7.097 13 7.432 13 7.736V19.806C13 20.641 13.672 21.065 14.084 21.197C14.502 21.33 15.225 21.36 15.73 20.802C16.548 19.898 17.959 18.792 20.113 18.549C21.09 18.439 22 17.639 22 16.503V4.496Z"
-                    fill="#ACACAC"
-                  />
-                </svg>
-                <div className="shrink-0 [letter-spacing:-0.14px] w-max text-[#323232] font-sans font-medium text-[15px]/4.5">
-                  Read the skill.md
-                </div>
-              </div>
-            </div>
-          </a>
         </div>
       </div>
     </div>
