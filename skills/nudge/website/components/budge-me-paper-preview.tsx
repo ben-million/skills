@@ -586,6 +586,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           ref={barRef}
           className="shrink-0"
           style={{
+            position: "relative",
             display: "flex",
             height: 37,
             alignItems: "center",
@@ -594,8 +595,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             padding: "0 16px",
             ...(f.showText === false ? { marginTop: "auto" } : {}),
             marginBottom: 24,
-            background: "#161616",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
             fontSynthesis: "none",
             WebkitFontSmoothing: "antialiased",
             userSelect: "none",
@@ -613,6 +612,19 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               : "none",
           }}
         >
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: 9999,
+            background: "#161616",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            transformOrigin: activeKey === "up" ? "center bottom" : activeKey === "down" ? "center top" : "center center",
+            transform: `scaleY(${activeKey ? 1.012 : 1})`,
+            transition: activeKey
+              ? "transform 0.03s cubic-bezier(0, 0, 0.2, 1)"
+              : "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          }} />
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
           {confirmed ? (
             <span
               style={{
@@ -624,7 +636,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 whiteSpace: "nowrap",
               }}
             >
-              Prompt copied
+              Copied
             </span>
           ) : (
             <>
@@ -716,6 +728,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               </div>
             </>
           )}
+          </div>
         </div>
       </div>
 
