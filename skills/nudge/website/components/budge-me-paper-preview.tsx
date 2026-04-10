@@ -13,7 +13,7 @@ const ORIGINAL = 61;
 const SLIDES = [
   { label: "font size", min: 32, max: 86, original: 61, unit: "px", demo: 48 },
   { label: "opacity", min: 0, max: 100, original: 100, unit: "%", demo: 20 },
-  { label: "padding", min: 0, max: 48, original: 16, unit: "px", demo: 6 },
+  { label: "padding", min: 6, max: 48, original: 16, unit: "px", demo: 6 },
   { label: "color", min: 0, max: 360, original: 220, unit: "°", demo: 160 },
 ];
 
@@ -292,6 +292,18 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   useEffect(() => {
     if (autoFocus) containerRef.current?.focus();
   }, [autoFocus]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function onWindowFocus() {
+      if (el && el.contains(document.activeElement) || document.activeElement === document.body) {
+        el?.focus();
+      }
+    }
+    window.addEventListener("focus", onWindowFocus);
+    return () => window.removeEventListener("focus", onWindowFocus);
+  }, []);
 
   const [slide, setSlide] = useState(0);
   const s = SLIDES[slide];
@@ -573,56 +585,57 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       tabIndex={0}
       onPointerDown={() => containerRef.current?.focus()}
       className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
-      <div className={`flex flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
+      <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
-          <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] pt-3.5 self-center uppercase">
+          <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] pt-3.5 self-center shrink-0 uppercase">
 {s.label}
           </div>
         )}
         {f.showText !== false && (
-          <div style={{
-            position: "relative",
-            padding: slide === 2 ? value : 0,
-            marginTop: slide === 2 ? 12 - value : 12,
-            marginBottom: slide === 2 ? -value : 0,
-            background: slide === 2 ? "rgba(59, 130, 246, 0.08)" : "transparent",
-            borderRadius: slide === 2 ? 6 : 0,
-            transition: "padding 0.1s cubic-bezier(0.32, 0.72, 0, 1), margin 0.1s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s ease, border-radius 0.2s ease",
-          }}>
-            {slide === 2 && (
-              <div style={{
-                position: "absolute",
-                inset: 0,
-                border: "1.5px dashed rgba(59, 130, 246, 0.35)",
-                borderRadius: 6,
-                pointerEvents: "none",
-              }} />
-            )}
-            <div
-              className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
-              style={{
-                fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
-                fontSize: slide === 0 ? `${value}px` : '61px',
-                opacity: slide === 1 ? value / 100 : 1,
-                color: isColorSlide ? targetColor : undefined,
-                background: slide === 2 ? "#FEFEFE" : "transparent",
-                borderRadius: slide === 2 ? 3 : 0,
-                transition: slide === 0
-                  ? "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
-                  : slide === 1
-                    ? "opacity 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
-                    : isColorSlide
-                      ? "color 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
-                      : "background 0.2s ease",
-              }}
-            >
-              budge
+          <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center">
+            <div style={{
+              position: "relative",
+              padding: slide === 2 ? value : 0,
+              background: slide === 2 ? "rgba(59, 130, 246, 0.08)" : "transparent",
+              borderRadius: slide === 2 ? 6 : 0,
+              transition: "padding 0.1s cubic-bezier(0.32, 0.72, 0, 1), background 0.2s ease, border-radius 0.2s ease",
+            }}>
+              {slide === 2 && (
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  border: "1.5px dashed rgba(59, 130, 246, 0.35)",
+                  borderRadius: 6,
+                  pointerEvents: "none",
+                }} />
+              )}
+              <div
+                className="left-0 top-0 [white-space-collapse:preserve] relative text-[#3C3C3C] text-[61px]/18.5"
+                style={{
+                  fontFamily: '"Ivar Hand TRIAL", ui-serif, serif',
+                  fontSize: slide === 0 ? `${value}px` : '61px',
+                  opacity: slide === 1 ? value / 100 : 1,
+                  color: isColorSlide ? targetColor : undefined,
+                  background: slide === 2 ? "#FEFEFE" : "transparent",
+                  borderRadius: slide === 2 ? 3 : 0,
+                  transition: slide === 0
+                    ? "font-size 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                    : slide === 1
+                      ? "opacity 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                      : isColorSlide
+                        ? "color 0.1s cubic-bezier(0.32, 0.72, 0, 1)"
+                        : "background 0.2s ease",
+                }}
+              >
+                budge
+              </div>
             </div>
           </div>
         )}
 
         <div
           ref={barRef}
+          className="shrink-0"
           style={{
             display: "flex",
             height: 37,
@@ -630,7 +643,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             justifyContent: "center",
             borderRadius: 9999,
             padding: "0 16px",
-            marginTop: "auto",
+            ...(f.showText === false ? { marginTop: "auto" } : {}),
             marginBottom: 24,
             background: "#161616",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
