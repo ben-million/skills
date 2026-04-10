@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Calligraph } from "calligraph";
 
 const FONT = "'Open Runde', system-ui, sans-serif";
-const SHAKE_KEYFRAMES = `@keyframes __nudge-shake{0%,100%{translate:0}25%{translate:-2px}50%{translate:2px}75%{translate:-1px}}`;
+const SHAKE_KEYFRAMES = `@keyframes __nudge-shake{0%,100%{translate:0}25%{translate:-2px}50%{translate:2px}75%{translate:-1px}}@keyframes nudge-copied-in{0%{opacity:0;transform:scale(0.85)}100%{opacity:1;transform:scale(1)}}`;
 let shakeInjected = false;
 const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
@@ -671,6 +671,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
           {confirmed ? (
             <span
+              key="copied"
               style={{
                 color: "#fff",
                 fontFamily: FONT,
@@ -678,6 +679,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 fontSize: 14.5,
                 lineHeight: "22px",
                 whiteSpace: "nowrap",
+                animation: "nudge-copied-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
               }}
             >
               Copied
