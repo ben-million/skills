@@ -217,6 +217,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [confirmed, setConfirmed] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | null>(null);
+  const [muted, setMuted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [shaking, setShaking] = useState(false);
@@ -231,8 +232,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const digitBufferRef = useRef("");
   const digitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueRef = useRef(ORIGINAL);
-  const calibrationRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const calibratedRef = useRef<Set<number>>(new Set([0]));
   const holdIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -267,17 +266,16 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
 
   const [slide, setSlide] = useState(0);
   const s = SLIDES[slide];
+  const soundOn = f.sound && !muted;
 
   const goToSlide = useCallback((index: number) => {
     index = ((index % SLIDES.length) + SLIDES.length) % SLIDES.length;
-    calibrationRef.current.forEach(clearTimeout);
-    calibrationRef.current = [];
     setSlide(index);
     const cfg = SLIDES[index];
     valueRef.current = cfg.original;
     setValue(cfg.original);
     setTypedRaw(null);
-    setIsNudging(true);
+    setIsNudging(false);
     setShaking(false);
     setConfirmed(false);
     setShowPrompt(false);
@@ -287,60 +285,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     clearTimeout(nudgeTimeoutRef.current);
     clearTimeout(shakeTimeoutRef.current);
     clearTimeout(confirmedTimeoutRef.current);
-
-    if (!calibratedRef.current.has(index)) {
-      calibratedRef.current.add(index);
-
-      const steps: [number, number][] = [];
-      const range = cfg.original - cfg.demo;
-      const downSteps = 4;
-      const upSteps = 5;
-      let t = 200;
-
-      for (let i = 1; i <= downSteps; i++) {
-        const val = Math.round(cfg.original - (range * i) / downSteps);
-        steps.push([t, val]);
-        t += 75 + i * 8;
-      }
-      t += 150;
-      for (let i = 1; i <= upSteps; i++) {
-        const val = Math.round(cfg.demo + (range * i) / upSteps);
-        steps.push([t, val]);
-        t += 65 + (upSteps - i) * 6;
-      }
-
-      steps.forEach(([delay, val], i) => {
-        calibrationRef.current.push(
-          setTimeout(() => {
-            valueRef.current = val;
-            setValue(val);
-            setIsNudging(true);
-            setActiveKey(i < downSteps ? "down" : "up");
-            if (f.sound) playTick();
-            clearTimeout(nudgeTimeoutRef.current);
-          }, delay),
-          setTimeout(() => {
-            setActiveKey(null);
-          }, delay + 60),
-        );
-      });
-
-      calibrationRef.current.push(
-        setTimeout(() => {
-          setIsNudging(false);
-        }, t + 300),
-      );
-    } else {
-      setIsNudging(false);
-    }
-  }, [f.sound]);
-
-  const cancelCalibration = useCallback(() => {
-    if (calibrationRef.current.length === 0) return;
-    calibrationRef.current.forEach(clearTimeout);
-    calibrationRef.current = [];
-    setActiveKey(null);
   }, []);
+
 
   const applyDigitBufferRef = useRef(() => {});
   applyDigitBufferRef.current = () => {
@@ -359,7 +305,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   };
 
   const step = useCallback((direction: number, shift = false, held = false) => {
-    cancelCalibration();
     const mult = (f.shiftStep && shift) ? 10 : 1;
     const next = valueRef.current + direction * mult;
     if (next > s.max || next < s.min) {
@@ -384,7 +329,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
         }, 400);
       }
-      if (f.sound) playBoundary(next > s.max);
+      if (soundOn) playBoundary(next > s.max);
       return;
     }
     atBoundary = false;
@@ -398,8 +343,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     setShaking(false);
     valueRef.current = next;
     setValue(valueRef.current);
-    if (f.sound) playTick(held);
-  }, [f.shiftStep, f.boundaryShake, f.sound, s.min, s.max, cancelCalibration]);
+    if (soundOn) playTick(held);
+  }, [f.shiftStep, f.boundaryShake, soundOn, s.min, s.max]);
 
   const triggerNudge = useCallback(
     (dir: "up" | "down") => {
@@ -438,7 +383,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   }, [isNudging]);
 
   const reset = useCallback(() => {
-    cancelCalibration();
     const prev = valueRef.current;
     valueRef.current = s.original;
     setValue(s.original);
@@ -447,17 +391,16 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     clearTimeout(nudgeTimeoutRef.current);
     nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
-    if (f.sound) {
+    if (soundOn) {
       if (Math.floor(prev / 10) !== Math.floor(s.original / 10)) {
         playDoubleTick();
       } else {
         playTick();
       }
     }
-  }, [f.buttonFeedback, f.sound, s.original, cancelCalibration]);
+  }, [f.buttonFeedback, soundOn, s.original]);
 
   const copy = useCallback(() => {
-    cancelCalibration();
     const props = ["font-size", "opacity", "padding", "color"];
     const prop = props[slide] ?? props[0];
     const val = slide === 3 ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${s.unit}`;
@@ -473,8 +416,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       setIsNudging(false);
     }, 800);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
-    if (f.sound) playConfirm();
-  }, [f.buttonFeedback, f.sound, slide, cancelCalibration]);
+    if (soundOn) playConfirm();
+  }, [f.buttonFeedback, soundOn, slide]);
 
   useEffect(() => {
     if (!f.keyboard) return;
@@ -506,7 +449,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         if (!isNaN(num)) {
           setTypedRaw(digitBufferRef.current);
           setIsNudging(true);
-          if (f.sound) playTick();
+          if (soundOn) playTick();
           if (num >= s.min && num <= s.max) {
             valueRef.current = num;
             setValue(num);
@@ -527,7 +470,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               clearTimeout(shakeTimeoutRef.current);
               shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
             }
-            if (f.sound) playAlert();
+            if (soundOn) playAlert();
             nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
           } else {
             setTypedRaw(null);
@@ -566,7 +509,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       el.removeEventListener("keyup", onKeyUp);
       clearTimeout(nudgeTimeoutRef.current);
     };
-  }, [step, reset, copy, goToSlide, slide, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, f.sound, s.min, s.max]);
+  }, [step, reset, copy, goToSlide, slide, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, soundOn, s.min, s.max]);
 
   const displayNum = typedRaw !== null ? typedRaw : `${value}`;
   const displayUnit = s.unit;
@@ -599,8 +542,23 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[#FEFEFE] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
       <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
-          <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] pt-3.5 self-center shrink-0 uppercase">
+          <div className="flex w-full items-center pt-2.5 px-3 shrink-0">
+            <div className="size-9 shrink-0" />
+            <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] text-center uppercase flex-1">
 {s.label}
+            </div>
+            <div
+              className="flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+              onClick={() => setMuted(m => !m)}
+            >
+              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: "auto", flexShrink: 0 }}>
+                {muted ? (
+                  <path fillRule="evenodd" clipRule="evenodd" d="M14 6C14 4.352 12.118 3.411 10.8 4.4L6.712 7.466L4.299 7.225C2.532 7.048 1 8.435 1 10.21V13.79C1 15.565 2.532 16.952 4.299 16.775L6.712 16.534L10.8 19.6C12.118 20.589 14 19.648 14 18V6ZM22.707 8.793C23.098 9.184 23.098 9.817 22.707 10.207L20.914 12L22.707 13.793C23.098 14.184 23.098 14.817 22.707 15.207C22.317 15.598 21.683 15.598 21.293 15.207L19.5 13.414L17.707 15.207C17.317 15.598 16.683 15.598 16.293 15.207C15.902 14.817 15.902 14.184 16.293 13.793L18.086 12L16.293 10.207C15.902 9.817 15.902 9.184 16.293 8.793C16.683 8.403 17.317 8.403 17.707 8.793L19.5 10.586L21.293 8.793C21.683 8.403 22.317 8.403 22.707 8.793Z" fill="#B0B0B0" />
+                ) : (
+                  <path fillRule="evenodd" clipRule="evenodd" d="M14 5.869C14 4.271 12.22 3.318 10.891 4.205L6.697 7H4C2.343 7 1 8.343 1 10V14C1 15.657 2.343 17 4 17H6.697L10.891 19.796C12.22 20.682 14 19.729 14 18.132V5.869ZM22.042 8.466C22.676 9.549 23.007 10.783 23 12.037C22.993 13.292 22.649 14.522 22.004 15.598C21.359 16.675 20.437 17.558 19.334 18.155C18.848 18.418 18.241 18.238 17.978 17.752C17.715 17.267 17.895 16.66 18.381 16.397C19.169 15.97 19.828 15.339 20.289 14.57C20.75 13.802 20.995 12.923 21 12.027C21.005 11.13 20.768 10.249 20.316 9.476C19.863 8.702 19.211 8.064 18.428 7.629C17.945 7.361 17.771 6.752 18.039 6.269C18.307 5.787 18.916 5.613 19.399 5.881C20.496 6.49 21.409 7.383 22.042 8.466ZM19 12.016C19.003 11.478 18.861 10.95 18.59 10.485C18.318 10.021 17.927 9.639 17.457 9.377C16.974 9.109 16.365 9.283 16.097 9.766C15.829 10.249 16.003 10.858 16.486 11.126C16.642 11.213 16.773 11.34 16.863 11.495C16.954 11.65 17.001 11.826 17 12.005C16.999 12.185 16.95 12.36 16.858 12.514C16.766 12.668 16.634 12.794 16.476 12.879C15.991 13.142 15.81 13.749 16.073 14.235C16.336 14.721 16.943 14.901 17.429 14.638C17.901 14.382 18.297 14.003 18.573 13.542C18.85 13.081 18.997 12.554 19 12.016Z" fill="#B0B0B0" />
+                )}
+              </svg>
+            </div>
           </div>
         )}
         {f.showText !== false && (
@@ -825,7 +783,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       {f.showButtons !== false && (
         <div className="flex items-center justify-between h-15 shrink-0 px-3.5">
           <div
-            onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } if (f.sound) playTick(); goToSlide(slide - 1); }}
+            onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } if (soundOn) playTick(); goToSlide(slide - 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
             style={f.buttonFeedback ? {
               transform: pressedButton === "prev" ? "translateX(-2px) scale(0.9)" : "translateX(0) scale(1)",
@@ -877,7 +835,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             </button>
           </div>
           <div
-            onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } if (f.sound) playTick(); goToSlide(slide + 1); }}
+            onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } if (soundOn) playTick(); goToSlide(slide + 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
             style={f.buttonFeedback ? {
               transform: pressedButton === "next" ? "translateX(2px) scale(0.9)" : "translateX(0) scale(1)",
