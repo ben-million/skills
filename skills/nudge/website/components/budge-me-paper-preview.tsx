@@ -220,6 +220,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [shaking, setShaking] = useState(false);
+  const [boundaryLabel, setBoundaryLabel] = useState<"Min" | "Max" | null>(null);
+  const [boundaryLabelVisible, setBoundaryLabelVisible] = useState(false);
+  const boundaryHitsRef = useRef(0);
+  const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -363,10 +368,33 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         clearTimeout(shakeTimeoutRef.current);
         shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
       }
+      boundaryHitsRef.current++;
+      if (boundaryHitsRef.current >= 20) {
+        const label = next > s.max ? "Max" : "Min";
+        setBoundaryLabel(label);
+        clearTimeout(boundaryLabelTimeoutRef.current);
+        clearTimeout(boundaryLabelExitRef.current);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setBoundaryLabelVisible(true);
+          });
+        });
+        boundaryLabelTimeoutRef.current = setTimeout(() => {
+          setBoundaryLabelVisible(false);
+          boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
+        }, 400);
+      }
       if (f.sound) playBoundary(next > s.max);
       return;
     }
     atBoundary = false;
+    boundaryHitsRef.current = 0;
+    if (boundaryLabel) {
+      setBoundaryLabelVisible(false);
+      clearTimeout(boundaryLabelTimeoutRef.current);
+      clearTimeout(boundaryLabelExitRef.current);
+      boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
+    }
     setShaking(false);
     valueRef.current = next;
     setValue(valueRef.current);
@@ -386,6 +414,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     const d = dir === "up" ? 1 : -1;
     step(d);
     setActiveKey(dir);
+    clearTimeout(nudgeTimeoutRef.current);
+    if (isNudging) {
+      setIsNudging(true);
+    }
     clearTimeout(holdTimeoutRef.current);
     clearInterval(holdIntervalRef.current);
     holdTimeoutRef.current = setTimeout(() => {
@@ -393,13 +425,17 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         step(d, false, true);
       }, 50);
     }, 300);
-  }, [step]);
+  }, [step, isNudging]);
 
   const stopHold = useCallback(() => {
     clearTimeout(holdTimeoutRef.current);
     clearInterval(holdIntervalRef.current);
     setActiveKey(null);
-  }, []);
+    if (isNudging) {
+      clearTimeout(nudgeTimeoutRef.current);
+      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+    }
+  }, [isNudging]);
 
   const reset = useCallback(() => {
     cancelCalibration();
@@ -639,6 +675,29 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               : "none",
           }}
         >
+          {boundaryLabel && (
+            <div style={{
+              position: "absolute",
+              bottom: "100%",
+              left: 16,
+              display: "flex",
+              justifyContent: "flex-start",
+              paddingBottom: 4,
+              pointerEvents: "none",
+              opacity: boundaryLabelVisible ? 1 : 0,
+              transform: boundaryLabelVisible ? "translateY(0)" : "translateY(8px)",
+              transition: "opacity 0.25s ease, transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            }}>
+              <span style={{
+                fontFamily: FONT,
+                fontSize: 13,
+                fontWeight: 500,
+                color: "#161616",
+              }}>
+                {boundaryLabel}
+              </span>
+            </div>
+          )}
           <div style={{
             position: "absolute",
             inset: 0,
@@ -681,7 +740,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 }}
               >
 {f.animatedDigits ? (
-                  <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 48, textAlign: "left" }}>
+                  <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 44, textAlign: "left" }}>
                     <Calligraph
                       variant="slots"
                       animation="snappy"
@@ -710,7 +769,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                     }}>{displayUnit}</span>
                   </span>
                 ) : (
-                  <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 48, textAlign: "left" }}>
+                  <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 44, textAlign: "left" }}>
                     <span
                       style={{
                         color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",

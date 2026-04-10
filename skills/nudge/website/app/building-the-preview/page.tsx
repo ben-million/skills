@@ -141,18 +141,27 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Physics">
               <P>
-                Three things happen at once. The arrows bounce — 1.5px up and
-                1.05× scale on press (100ms, overshoot curve), slower ease back
-                on release. The fill flashes white for 50ms. The bar scales
-                between 0.8× idle, 1× active, and 1.02× on confirm. Scaling up
-                uses a 250ms spring with overshoot{" "}
-                <Code>cubic-bezier(0.34, 1.56, 0.64, 1)</Code>; scaling back
-                down is a slower 500ms ease-out with no bounce, so it pops into
-                action and settles gently.
+                Three things happen at once. The arrows snap — 2.5px in their
+                pointing direction and 1.08× scale on press, in just 30ms with
+                a sharp ease-out. The return is deliberately slow: 450ms with a
+                springy overshoot{" "}
+                <Code>cubic-bezier(0.34, 1.8, 0.64, 1)</Code> so the arrow
+                pops into position and lazily wobbles back. This asymmetry —
+                instant engagement, elastic recovery — is what makes physical
+                buttons feel satisfying. The fill flashes white for 50ms.
               </P>
               <P>
-                At idle the bar fades to 80% opacity. It snaps back to 100%
-                instantly when nudging, then fades with a 400ms ease and 100ms
+                The bar&apos;s background subtly stretches in the direction of
+                the nudge — a 1.2% <Code>scaleY</Code> with{" "}
+                <Code>transform-origin</Code> set to bottom for up-nudges and
+                top for down-nudges. The background is a separate absolutely
+                positioned layer so the contents stay perfectly still while the
+                pill shape breathes directionally.
+              </P>
+              <P>
+                The bar scales between 0.8× idle, 1× active, and 1.02× on
+                confirm. At idle it fades to 80% opacity, snapping back to 100%
+                instantly when nudging, then fading with a 400ms ease and 100ms
                 delay to prevent flicker during rapid use.
               </P>
               <Demo>
@@ -184,8 +193,11 @@ export default function BuildingThePreviewPage() {
                 <Code>infinite</Code> while true.
               </P>
               <P>
-                A macOS-style alert sound also plays, throttled to once per
-                400ms so it doesn&apos;t stack.
+                A distinct Oreo key sample plays when you first hit a boundary
+                — one sound for max, a different one for min. The sound only
+                fires once on the initial impact; holding the key past the
+                limit keeps the shake going but stays silent. Moving back
+                inward resets it so the next boundary hit rings again.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_5} />
@@ -194,21 +206,24 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Sound">
               <P>
-                Every value change plays a mechanical tick synthesised with the
-                Web Audio API. The sound is a pre-computed 8ms AudioBuffer:
-                a noise strike, a 3200Hz metallic ring, a 5100Hz secondary
-                resonance, and a 900Hz body. A deterministic PRNG seeds the
-                noise so every tick is identical.
+                Every value change plays a real mechanical keyboard sound — the
+                Oreo switch from{" "}
+                <a href="https://tryklack.com" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">Klack</a>.
+                The MP3 sprite sheet contains recordings of multiple keys. The
+                preview cycles through the three highest-pitched samples,
+                alternating on each tick so consecutive presses never sound
+                identical. Volume varies ±15% per click for additional
+                natural variation.
               </P>
               <P>
                 When holding a key, the tick is throttled to once every 50ms at
-                reduced volume (0.12 vs 0.25). Without this, the browser&apos;s
-                ~33ms keydown repeat creates overlapping clicks that buzz.
+                reduced volume. Without this, the browser&apos;s ~33ms keydown
+                repeat creates overlapping clicks that buzz.
               </P>
               <P>
                 Reset plays a double tick when crossing a tens boundary (e.g.
-                72→61). The confirm action has its own deeper, heavier latch
-                sound — same mechanical family, different weight.
+                72→61). The confirm action uses its own distinct Oreo key
+                sample — same switch family, different key.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_6} />
@@ -259,7 +274,10 @@ export default function BuildingThePreviewPage() {
                 The final layer adds button press feedback — 0.975× scale on
                 press, 30ms in, 70ms hold — and Shift+Arrow for 10× stepping
                 to cover the remaining gap between single ticks and direct
-                number entry.
+                number entry. Holding the mouse down on an arrow repeats the
+                same way as holding a key: one immediate step, then after a
+                300ms delay it fires every 50ms until release. Moving the
+                cursor off the arrow cancels the repeat.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_8} />
