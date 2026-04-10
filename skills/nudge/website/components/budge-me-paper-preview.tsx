@@ -505,7 +505,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     };
   }, [step, reset, copy, goToSlide, slide, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, f.sound, s.min, s.max]);
 
-  const displayValue = typedRaw !== null ? `${typedRaw}${s.unit}` : `${value}${s.unit}`;
+  const displayNum = typedRaw !== null ? typedRaw : `${value}`;
+  const displayUnit = s.unit;
   const typedOutOfRange = typedRaw !== null && (() => {
     const n = parseInt(typedRaw, 10);
     return !isNaN(n) && (n < s.min || n > s.max);
@@ -641,41 +642,59 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 }}
               >
 {f.animatedDigits ? (
-                  <Calligraph
-                    variant="slots"
-                    animation="snappy"
-                    stagger={0}
-                    style={{
+                  <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 48, textAlign: "left" }}>
+                    <Calligraph
+                      variant="slots"
+                      animation="snappy"
+                      stagger={0}
+                      style={{
+                        color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
+                        fontFamily: FONT,
+                        fontWeight: 500,
+                        fontSize: 14.5,
+                        lineHeight: "22px",
+                        whiteSpace: "nowrap",
+                        fontVariantNumeric: "tabular-nums",
+                        transition: "color 0.2s ease",
+                      }}
+                    >
+                      {displayNum}
+                    </Calligraph>
+                    <span style={{
                       color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
                       fontFamily: FONT,
                       fontWeight: 500,
-                      fontSize: 14.5,
+                      fontSize: 11,
                       lineHeight: "22px",
-                      whiteSpace: "nowrap",
-                      fontVariantNumeric: "tabular-nums",
-                      minWidth: 48,
-                      textAlign: "left",
                       transition: "color 0.2s ease",
-                    }}
-                  >
-                    {displayValue}
-                  </Calligraph>
+                      marginLeft: 1,
+                    }}>{displayUnit}</span>
+                  </span>
                 ) : (
-                  <span
-                    style={{
+                  <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 48, textAlign: "left" }}>
+                    <span
+                      style={{
+                        color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
+                        fontFamily: FONT,
+                        fontWeight: 500,
+                        fontSize: 14.5,
+                        lineHeight: "22px",
+                        whiteSpace: "nowrap",
+                        fontVariantNumeric: "tabular-nums",
+                        transition: "color 0.2s ease",
+                      }}
+                    >
+                      {displayNum}
+                    </span>
+                    <span style={{
                       color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
                       fontFamily: FONT,
                       fontWeight: 500,
-                      fontSize: 14.5,
+                      fontSize: 11,
                       lineHeight: "22px",
-                      whiteSpace: "nowrap",
-                      fontVariantNumeric: "tabular-nums",
-                      minWidth: 48,
-                      textAlign: "left",
                       transition: "color 0.2s ease",
-                    }}
-                  >
-                    {displayValue}
+                      marginLeft: 1,
+                    }}>{displayUnit}</span>
                   </span>
                 )}
               </div>
@@ -793,6 +812,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             hsl(<Calligraph
               variant="slots"
               animation="snappy"
+              stagger={0}
               style={{
                 fontFamily: "inherit",
                 fontSize: "inherit",
@@ -809,6 +829,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           <Calligraph
             variant="slots"
             animation="snappy"
+            stagger={0}
             style={{
               fontFamily: "inherit",
               fontSize: "inherit",
