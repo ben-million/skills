@@ -125,13 +125,17 @@ function Arrow({
   active,
   down,
   disabled,
-  onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
   activeColor,
 }: {
   active: boolean;
   down?: boolean;
   disabled?: boolean;
-  onClick?: () => void;
+  onPointerDown?: () => void;
+  onPointerUp?: () => void;
+  onPointerLeave?: () => void;
   activeColor?: string;
 }) {
   const fill = disabled ? "#A7A7A7" : active ? (activeColor ?? "#FFFFFF") : "#A7A7A7";
@@ -142,7 +146,9 @@ function Arrow({
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      onClick={disabled ? undefined : onClick}
+      onPointerDown={disabled ? undefined : onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
       style={{
         width: 19,
         height: "auto",
@@ -222,6 +228,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const valueRef = useRef(ORIGINAL);
   const calibrationRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const calibratedRef = useRef<Set<number>>(new Set([0]));
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (!shakeInjected) {
@@ -373,6 +381,25 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     },
     [step],
   );
+
+  const startHold = useCallback((dir: "up" | "down") => {
+    const d = dir === "up" ? 1 : -1;
+    step(d);
+    setActiveKey(dir);
+    clearTimeout(holdTimeoutRef.current);
+    clearInterval(holdIntervalRef.current);
+    holdTimeoutRef.current = setTimeout(() => {
+      holdIntervalRef.current = setInterval(() => {
+        step(d, false, true);
+      }, 50);
+    }, 300);
+  }, [step]);
+
+  const stopHold = useCallback(() => {
+    clearTimeout(holdTimeoutRef.current);
+    clearInterval(holdIntervalRef.current);
+    setActiveKey(null);
+  }, []);
 
   const reset = useCallback(() => {
     cancelCalibration();
@@ -716,13 +743,17 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                   down
                   active={f.arrowBounce ? activeKey === "down" : false}
                   disabled={shaking && atMin}
-                  onClick={() => triggerNudge("down")}
+                  onPointerDown={() => startHold("down")}
+                  onPointerUp={stopHold}
+                  onPointerLeave={stopHold}
                   activeColor={isColorSlide ? targetColor : undefined}
                 />
                 <Arrow
                   active={f.arrowBounce ? activeKey === "up" : false}
                   disabled={shaking && atMax}
-                  onClick={() => triggerNudge("up")}
+                  onPointerDown={() => startHold("up")}
+                  onPointerUp={stopHold}
+                  onPointerLeave={stopHold}
                   activeColor={isColorSlide ? targetColor : undefined}
                 />
               </div>
