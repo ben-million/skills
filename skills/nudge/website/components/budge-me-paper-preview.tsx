@@ -30,97 +30,60 @@ function getAudioCtx() {
   return audioCtx;
 }
 
-let tickBuffer: AudioBuffer | null = null;
+let oreoBuffer: AudioBuffer | null = null;
+let oreoLoading = false;
+let lastOreoIdx = 0;
 let lastAlertTime = 0;
 
-function getTickBuffer(ctx: AudioContext) {
-  if (tickBuffer && tickBuffer.sampleRate === ctx.sampleRate) return tickBuffer;
-  const sr = ctx.sampleRate;
-  const dur = 0.008;
-  const len = Math.ceil(sr * dur);
-  const buf = ctx.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
+const OREO_SPRITES: [number, number][] = [
+  [22000, 103], [12000, 109], [0, 120],
+];
+const OREO_BOUNDARY_MAX: [number, number] = [10000, 135];
+const OREO_BOUNDARY_MIN: [number, number] = [24000, 145];
 
-  let seed = 7;
-  function noise() {
-    seed = (seed * 16807 + 0) % 2147483647;
-    return (seed / 2147483647) * 2 - 1;
-  }
-
-  for (let i = 0; i < len; i++) {
-    const t = i / sr;
-
-    // Sharp strike impulse (first ~0.3ms)
-    const strike = noise() * Math.exp(-t * 20000);
-    // Metallic ring — the pawl/spring resonance
-    const ring = Math.sin(2 * Math.PI * 3200 * t) * Math.exp(-t * 1800);
-    // Secondary resonance — adds metallic complexity
-    const ring2 = Math.sin(2 * Math.PI * 5100 * t) * Math.exp(-t * 2500);
-    // Low body — subtle weight of the mechanism
-    const body = Math.sin(2 * Math.PI * 900 * t) * Math.exp(-t * 4000);
-
-    d[i] = 0.2 * strike + 0.4 * ring + 0.25 * ring2 + 0.15 * body;
-  }
-
-  tickBuffer = buf;
-  return buf;
+function loadOreoBuffer() {
+  if (oreoBuffer || oreoLoading) return;
+  oreoLoading = true;
+  const ctx = getAudioCtx();
+  fetch("/oreo.mp3")
+    .then(r => r.arrayBuffer())
+    .then(ab => ctx.decodeAudioData(ab))
+    .then(buf => { oreoBuffer = buf; })
+    .catch(() => { oreoLoading = false; });
 }
 
 function scheduleTick(time: number, volume: number) {
   const ctx = getAudioCtx();
+  loadOreoBuffer();
+  if (!oreoBuffer) return;
+  lastOreoIdx = (lastOreoIdx + 1) % OREO_SPRITES.length;
+  const sprite = OREO_SPRITES[lastOreoIdx];
+  const offset = sprite[0] / 1000;
+  const halfDur = sprite[1] / 1000 / 2;
   const src = ctx.createBufferSource();
-  src.buffer = getTickBuffer(ctx);
+  src.buffer = oreoBuffer;
   const gain = ctx.createGain();
-  gain.gain.value = volume;
+  gain.gain.value = volume * (0.85 + Math.random() * 0.3);
   src.connect(gain);
   gain.connect(ctx.destination);
-  src.start(time);
+  src.start(time, offset, halfDur);
 }
 
-let confirmBuffer: AudioBuffer | null = null;
-
-function getConfirmBuffer(ctx: AudioContext) {
-  if (confirmBuffer && confirmBuffer.sampleRate === ctx.sampleRate) return confirmBuffer;
-  const sr = ctx.sampleRate;
-  const dur = 0.025;
-  const len = Math.ceil(sr * dur);
-  const buf = ctx.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
-
-  let seed = 13;
-  function noise() {
-    seed = (seed * 16807 + 0) % 2147483647;
-    return (seed / 2147483647) * 2 - 1;
-  }
-
-  for (let i = 0; i < len; i++) {
-    const t = i / sr;
-
-    // Heavy strike — broader, weightier than the tick
-    const strike = noise() * Math.exp(-t * 12000);
-    // Low bolt — the latch engaging
-    const bolt = Math.sin(2 * Math.PI * 1400 * t) * Math.exp(-t * 800);
-    // Metallic catch — brief ring at the end
-    const catch_ = Math.sin(2 * Math.PI * 3800 * t) * Math.exp(-t * 1200);
-    // Body resonance
-    const body = Math.sin(2 * Math.PI * 600 * t) * Math.exp(-t * 1500);
-
-    d[i] = 0.2 * strike + 0.3 * bolt + 0.2 * catch_ + 0.3 * body;
-  }
-
-  confirmBuffer = buf;
-  return buf;
-}
+const OREO_CONFIRM: [number, number] = [8000, 112];
 
 function playConfirm() {
   const ctx = getAudioCtx();
+  loadOreoBuffer();
+  if (!oreoBuffer) return;
+  const offset = OREO_CONFIRM[0] / 1000;
+  const halfDur = OREO_CONFIRM[1] / 1000 / 2;
   const src = ctx.createBufferSource();
-  src.buffer = getConfirmBuffer(ctx);
+  src.buffer = oreoBuffer;
   const gain = ctx.createGain();
-  gain.gain.value = 0.3;
+  gain.gain.value = 0.6;
   src.connect(gain);
   gain.connect(ctx.destination);
-  src.start(ctx.currentTime);
+  src.start(ctx.currentTime, offset, halfDur);
 }
 
 function playTick(held = false) {
@@ -129,47 +92,27 @@ function playTick(held = false) {
   lastTickTime = now;
 
   const ctx = getAudioCtx();
-  scheduleTick(ctx.currentTime, held ? 0.12 : 0.25);
+  scheduleTick(ctx.currentTime, held ? 0.3 : 0.55);
 }
 
-function playAlert() {
-  const now = performance.now();
-  if (now - lastAlertTime < 400) return;
-  lastAlertTime = now;
+let atBoundary = false;
 
+function playBoundary(isMax: boolean) {
+  if (atBoundary) return;
+  atBoundary = true;
   const ctx = getAudioCtx();
-  const t = ctx.currentTime;
-
-  function bonk(freq: number, start: number, dur: number, vol: number) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(freq, start);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.82, start + dur);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(vol, start + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(start);
-    osc.stop(start + dur + 0.01);
-
-    // Overtone for woody timbre
-    const h = ctx.createOscillator();
-    const hg = ctx.createGain();
-    h.type = "sine";
-    h.frequency.setValueAtTime(freq * 3.2, start);
-    h.frequency.exponentialRampToValueAtTime(freq * 2.6, start + dur);
-    hg.gain.setValueAtTime(vol * 0.15, start);
-    hg.gain.exponentialRampToValueAtTime(0.0001, start + dur * 0.6);
-    h.connect(hg);
-    hg.connect(ctx.destination);
-    h.start(start);
-    h.stop(start + dur + 0.01);
-  }
-
-  bonk(490, t, 0.08, 0.12);
-  bonk(370, t + 0.06, 0.1, 0.1);
+  loadOreoBuffer();
+  if (!oreoBuffer) return;
+  const sprite = isMax ? OREO_BOUNDARY_MAX : OREO_BOUNDARY_MIN;
+  const offset = sprite[0] / 1000;
+  const halfDur = sprite[1] / 1000 / 2;
+  const src = ctx.createBufferSource();
+  src.buffer = oreoBuffer;
+  const gain = ctx.createGain();
+  gain.gain.value = 0.55;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(ctx.currentTime, offset, halfDur);
 }
 
 function playDoubleTick() {
@@ -294,6 +237,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   }, [autoFocus]);
 
   useEffect(() => {
+    if (f.sound) loadOreoBuffer();
+  }, [f.sound]);
+
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     function onWindowFocus() {
@@ -408,9 +355,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         clearTimeout(shakeTimeoutRef.current);
         shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
       }
-      if (f.sound) playAlert();
+      if (f.sound) playBoundary(next > s.max);
       return;
     }
+    atBoundary = false;
     setShaking(false);
     valueRef.current = next;
     setValue(valueRef.current);
@@ -696,6 +644,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                   <Calligraph
                     variant="slots"
                     animation="snappy"
+                    stagger={0}
                     style={{
                       color: shaking || typedOutOfRange ? "#A7A7A7" : "#fff",
                       fontFamily: FONT,
@@ -754,7 +703,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       {f.showButtons !== false && (
         <div className="flex items-center justify-between h-15 shrink-0 px-3.5">
           <div
-            onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide - 1); }}
+            onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } if (f.sound) playTick(); goToSlide(slide - 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
             style={f.buttonFeedback ? {
               transform: pressedButton === "prev" ? "translateX(-2px) scale(0.9)" : "translateX(0) scale(1)",
@@ -806,7 +755,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             </button>
           </div>
           <div
-            onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } goToSlide(slide + 1); }}
+            onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } if (f.sound) playTick(); goToSlide(slide + 1); }}
             className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
             style={f.buttonFeedback ? {
               transform: pressedButton === "next" ? "translateX(2px) scale(0.9)" : "translateX(0) scale(1)",
@@ -837,6 +786,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           gap: "0.35em",
         }}
       >
+        <span style={{ color: "#999", fontStyle: "italic", marginRight: "0.15em" }}>Prompt</span>
         <span>Set {["font-size", "opacity", "padding", "color"][slide]} to </span>
         {slide === 3 ? (
           <span>
