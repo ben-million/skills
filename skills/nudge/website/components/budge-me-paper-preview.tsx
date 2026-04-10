@@ -148,10 +148,10 @@ function Arrow({
         height: "auto",
         flexShrink: 0,
         cursor: disabled ? "default" : "pointer",
-        transform: `rotate(${down ? 180 : 0}deg) translateY(${active && !disabled ? -1.5 : 0}px) scale(${active && !disabled ? 1.05 : 1})`,
+        transform: `rotate(${down ? 180 : 0}deg) translateY(${active && !disabled ? -2.5 : 0}px) scale(${active && !disabled ? 1.08 : 1})`,
         transition: active
-          ? "transform 0.1s cubic-bezier(0.2, 0, 0, 1.6)"
-          : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+          ? "transform 0.03s cubic-bezier(0, 0, 0.2, 1)"
+          : "transform 0.45s cubic-bezier(0.34, 1.8, 0.64, 1)",
       }}
     >
       <path
