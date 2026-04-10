@@ -106,18 +106,9 @@ export default function BuildingThePreviewPage() {
           <div className="flex flex-col gap-24 mt-10">
             <Section title="The value readout">
               <P>
-                When you press an arrow key, the value display slides in from
-                the left with a <Code>max-width</Code> transition. After 600ms
-                of inactivity it collapses back. The expand is 500ms with a
-                delayed opacity fade; the collapse is faster at 450ms with
-                immediate opacity. This asymmetry makes it feel responsive
-                opening and not jarring closing.
-              </P>
-              <P>
-                Clicking the arrows deliberately does not expand the value
-                display. The reason: the expanding readout shifts the arrow
-                buttons sideways, which would make you miss on consecutive
-                clicks.
+                The readout slides in fast and collapses gently — responsiveness on engagement, patience on disengagement. Clicking the arrows doesn&apos;t expand it, because the expanding readout would push the buttons sideways. Per{" "}
+                <a href="https://lawsofux.com/fittss-law/" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">Fitts&apos;s Law</a>
+                , your target just moved out from under your cursor.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_3} />
@@ -126,13 +117,7 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Animated digits">
               <P>
-                The plain text readout works, but the digits just swap
-                instantly — there&apos;s no sense of movement. Wrapping the
-                value in Calligraph with <Code>variant=&ldquo;slots&rdquo;</Code>{" "}
-                and <Code>animation=&ldquo;snappy&rdquo;</Code> gives each
-                digit its own slot that rolls up or down when the number
-                changes. It turns a static label into something that feels
-                mechanically connected to the arrows.
+                Swapping numbers instantly felt disconnected — no causality between the arrow and the value. Rolling each digit in its slot fixed it: press up, the digit rolls up. Direct manipulation, not a label update.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_3B} />
@@ -141,28 +126,7 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Physics">
               <P>
-                Three things happen at once. The arrows snap — 2.5px in their
-                pointing direction and 1.08× scale on press, in just 30ms with
-                a sharp ease-out. The return is deliberately slow: 450ms with a
-                springy overshoot{" "}
-                <Code>cubic-bezier(0.34, 1.8, 0.64, 1)</Code> so the arrow
-                pops into position and lazily wobbles back. This asymmetry —
-                instant engagement, elastic recovery — is what makes physical
-                buttons feel satisfying. The fill flashes white for 50ms.
-              </P>
-              <P>
-                The bar&apos;s background subtly stretches in the direction of
-                the nudge — a 1.2% <Code>scaleY</Code> with{" "}
-                <Code>transform-origin</Code> set to bottom for up-nudges and
-                top for down-nudges. The background is a separate absolutely
-                positioned layer so the contents stay perfectly still while the
-                pill shape breathes directionally.
-              </P>
-              <P>
-                The bar scales between 0.8× idle, 1× active, and 1.02× on
-                confirm. At idle it fades to 80% opacity, snapping back to 100%
-                instantly when nudging, then fading with a 400ms ease and 100ms
-                delay to prevent flicker during rapid use.
+                What makes a physical button satisfying is asymmetry: fast snap on press, slow springy recovery on release. If both halves were the same speed it would feel mushy. The bar&apos;s background subtly stretches in the direction of the nudge — barely perceptible, but it registers subconsciously. At idle, the bar recedes; the moment you interact, it snaps to full presence.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_4} />
@@ -171,33 +135,9 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Boundaries">
               <P>
-                Try going past the max or below the min. The bar shakes — a CSS
-                keyframe that loops at ±2px every 150ms. It plays continuously
-                while the key is held. Each slide defines its own range (e.g.
-                32–86 for font size, 0–100 for opacity, 0–48 for padding, and
-                0–360 for color), and the boundary logic adapts automatically.
-              </P>
-              <P>
-                While the bar shakes, the arrow that caused it drops to the
-                inactive gray and the value readout dims to match. The cursor
-                switches to default and clicks are ignored. It only lasts as
-                long as the shake — 300ms — then everything resets.
-              </P>
-              <P>
-                An earlier implementation used React{" "}
-                <Code>key</Code> remounting to restart the animation, which
-                caused visual glitches on key hold because each rapid keydown
-                remounted the entire bar. The fix: a boolean{" "}
-                <Code>shaking</Code> state that clears 300ms after the last
-                attempt, with the CSS animation set to{" "}
-                <Code>infinite</Code> while true.
-              </P>
-              <P>
-                A distinct Oreo key sample plays when you first hit a boundary
-                — one sound for max, a different one for min. The sound only
-                fires once on the initial impact; holding the key past the
-                limit keeps the shake going but stays silent. Moving back
-                inward resets it so the next boundary hit rings again.
+                The bar shakes — borrowed from macOS password fields, an instantly recognizable &ldquo;no.&rdquo; The sound plays once on impact, not on every repeat, because alarm fatigue is real. Spam the boundary 20 times and a &ldquo;Min&rdquo; or &ldquo;Max&rdquo; label floats up:{" "}
+                <a href="https://lawsofux.com/hicks-law/" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">progressive disclosure</a>
+                .
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_5} />
@@ -206,24 +146,9 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Sound">
               <P>
-                Every value change plays a real mechanical keyboard sound — the
-                Oreo switch from{" "}
-                <a href="https://tryklack.com" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">Klack</a>.
-                The MP3 sprite sheet contains recordings of multiple keys. The
-                preview cycles through the three highest-pitched samples,
-                alternating on each tick so consecutive presses never sound
-                identical. Volume varies ±15% per click for additional
-                natural variation.
-              </P>
-              <P>
-                When holding a key, the tick is throttled to once every 50ms at
-                reduced volume. Without this, the browser&apos;s ~33ms keydown
-                repeat creates overlapping clicks that buzz.
-              </P>
-              <P>
-                Reset plays a double tick when crossing a tens boundary (e.g.
-                72→61). The confirm action uses its own distinct Oreo key
-                sample — same switch family, different key.
+                Without sound, even polished animation feels like a puppet show. Synthesized clicks sounded thin, so I switched to real keyboard samples (the Oreo switch from{" "}
+                <a href="https://tryklack.com" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">Klack</a>
+                ). Three samples alternate with slight volume variation — identical repetition sounds robotic. Different actions get different keys from the same switch family, creating an audio hierarchy that mirrors the visual one.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_6} />
@@ -232,109 +157,29 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Number input">
               <P>
-                Arrow keys are fine for small adjustments, but jumping from 61
-                to 42 one tick at a time is painful. Typing digits solves this —
-                press <Code>4</Code> then <Code>2</Code> and the value lands
-                instantly.
-              </P>
-              <P>
-                The implementation uses a digit buffer. Each keypress appends to
-                it and the raw string is shown immediately as{" "}
-                <Code>typedRaw</Code> — so pressing <Code>4</Code> shows{" "}
-                &ldquo;4px&rdquo; even though 4 is out of range. If the
-                accumulated number falls within the slide&apos;s range, the
-                underlying value updates live on every keystroke. If not, the
-                display still reflects what you&apos;ve typed but turns gray
-                immediately to signal it&apos;s out of bounds — and the bar
-                doesn&apos;t move.
-              </P>
-              <P>
-                After 500ms of no further digits, the buffer commits. This
-                window is long enough to comfortably type two digits but short
-                enough that the UI doesn&apos;t feel sluggish. If the final
-                number is out of range it clamps to the nearest boundary,
-                triggers the shake, and plays the alert sound. Valid numbers
-                just settle in silently.
-              </P>
-              <P>
-                Input is capped at three digits — enough for any value in the
-                current slides but short enough to prevent runaway typing.
-                Each digit press plays a tick and expands the readout, so you
-                get the same tactile feedback as arrow nudging. The readout
-                shows the raw typed string rather than the clamped value, so
-                you see exactly what you entered before the system corrects it.
+                Three tiers for three intents: arrows for fine adjustment, Shift+Arrow for 10× jumps, direct typing for exact values. Typing follows{" "}
+                <a href="https://lawsofux.com/postels-law/" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">Postel&apos;s Law</a>
+                : show what you typed honestly, turn it gray if it&apos;s out of bounds, then gently clamp. Honest input, graceful correction.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_7} />
               </Demo>
             </Section>
 
-            <Section title="Everything else">
+            <Section title="Input equivalence">
               <P>
-                The final layer adds button press feedback — 0.975× scale on
-                press, 30ms in, 70ms hold — and Shift+Arrow for 10× stepping
-                to cover the remaining gap between single ticks and direct
-                number entry. Holding the mouse down on an arrow repeats the
-                same way as holding a key: one immediate step, then after a
-                300ms delay it fires every 50ms until release. Moving the
-                cursor off the arrow cancels the repeat.
+                Holding a mouse button on the arrows repeats identically to holding a key — same delay, same rate, same sound. The same action should feel the same regardless of how you trigger it.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_8} />
               </Demo>
             </Section>
 
-            <Section title="Slide design">
+            <Section title="Slides">
               <P>
-                A single demo only shows one property. To present the range of
-                what nudge can control, the preview cycles through four slides:
-                font size, opacity, padding, and color. Left/right chevron
-                buttons navigate between them, as do the arrow keys.
-              </P>
-              <P>
-                Each slide is defined as a config object — label, min, max,
-                original value, unit, and a demo target for the calibration
-                animation. The entire component reads from this config: boundary
-                checks, value display, copy prompt, and the text effect all
-                adapt automatically. Adding a new slide is a single line.
-              </P>
-              <P>
-                When you land on a new slide, a calibration sequence plays. It
-                mimics real usage — four ticks stepping down to the demo value,
-                a brief pause, then five ticks stepping back up. Each tick
-                fires an arrow bounce and a sound. The pacing decelerates on
-                the way down and accelerates on the way back, like someone
-                exploring then correcting. The bar starts at full scale
-                immediately so there&apos;s no awkward idle shrink before the
-                first tick.
-              </P>
-              <P>
-                The calibration can be interrupted. Any user interaction — a key
-                press, a click, a digit — cancels the remaining timeouts and
-                hands control back instantly. This prevents the demo from
-                fighting the user.
-              </P>
-              <P>
-                Each slide has its own visual treatment. Font size changes the{" "}
-                <Code>font-size</Code> of the text. Opacity fades it. Padding
-                wraps the text in a container with blue dashed guidelines and a
-                tinted background showing the padding area — negative vertical
-                margins cancel out the growth so the nudge bar stays in place.
-                Color shifts the text hue across 360° and, instead of showing
-                a numeric readout, flashes the arrows in the target color when
-                active.
-              </P>
-              <P>
-                The navigation buttons match the rest of the control&apos;s
-                design language: same pill shape, same box shadow, same press
-                feedback (0.9× scale, 30ms in). Instead of hiding at the
-                boundaries, the slides loop — going past the last wraps to the
-                first and vice versa. On press, each chevron nudges 2px in its
-                direction with an overshoot curve{" "}
-                <Code>cubic-bezier(0.2, 0, 0, 1.6)</Code>, mirroring the
-                vertical bounce the nudge arrows use. This works on both click
-                and left/right arrow keys. A small uppercase label at the top
-                center identifies the current property.
+                Four focused slides instead of everything at once ({" "}
+                <a href="https://lawsofux.com/hicks-law/" className="text-[#555] underline underline-offset-2 hover:text-[#333] transition-colors">Hick&apos;s Law</a>
+                ). Each preserves its state — losing someone&apos;s work because they navigated away erodes trust. Color skips the numeric readout and tints the arrows directly, because &ldquo;220°&rdquo; tells you nothing.
               </P>
               <div className="mt-6">
                 <BudgeMePaperPreview features={STAGE_SLIDES} />
@@ -343,20 +188,7 @@ export default function BuildingThePreviewPage() {
 
             <Section title="The prompt">
               <P>
-                Pressing Copy writes a prompt like{" "}
-                <Code>Set font-size to 48px</Code> to the clipboard and
-                immediately displays it below the preview. The prompt stays
-                visible and updates live as you continue nudging — the value
-                portion uses Calligraph slots so the digits roll in place
-                rather than swapping. For the color slide, only the hue number
-                animates; the surrounding{" "}
-                <Code>hsl(…, 70%, 55%)</Code> stays static to avoid
-                unnecessary slot churn.
-              </P>
-              <P>
-                Switching slides clears the prompt entirely. The idea is that
-                the prompt represents your current intent — once you move on,
-                it&apos;s gone.
+                Enter copies a prompt like <Code>Set font-size to 48px</Code> to the clipboard, shown below with live-rolling digits. The &ldquo;Copied&rdquo; confirmation springs in with the same bouncy scale as everything else — consistency in motion is what makes a control feel like one coherent object.
               </P>
             </Section>
           </div>
