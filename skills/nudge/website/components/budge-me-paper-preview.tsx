@@ -218,6 +218,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [showPrompt, setShowPrompt] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | null>(null);
   const [muted, setMuted] = useState(false);
+  const slideValuesRef = useRef<number[]>(SLIDES.map(s => s.original));
   const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [shaking, setShaking] = useState(false);
@@ -270,10 +271,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
 
   const goToSlide = useCallback((index: number) => {
     index = ((index % SLIDES.length) + SLIDES.length) % SLIDES.length;
+    slideValuesRef.current[slide] = valueRef.current;
     setSlide(index);
-    const cfg = SLIDES[index];
-    valueRef.current = cfg.original;
-    setValue(cfg.original);
+    const restored = slideValuesRef.current[index];
+    valueRef.current = restored;
+    setValue(restored);
     setTypedRaw(null);
     setIsNudging(false);
     setShaking(false);
@@ -285,7 +287,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     clearTimeout(nudgeTimeoutRef.current);
     clearTimeout(shakeTimeoutRef.current);
     clearTimeout(confirmedTimeoutRef.current);
-  }, []);
+  }, [slide]);
 
 
   const applyDigitBufferRef = useRef(() => {});
