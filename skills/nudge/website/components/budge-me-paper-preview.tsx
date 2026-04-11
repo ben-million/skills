@@ -242,6 +242,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const boundaryHitsRef = useRef(0);
   const [slideRangeVisible, setSlideRangeVisible] = useState(false);
   const [slideRangeIdle, setSlideRangeIdle] = useState(true);
+  const [hasUsedArrows, setHasUsedArrows] = useState(false);
   const slideRangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -469,6 +470,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     if (!f.keyboard) return;
 
     function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        setHasUsedArrows(true);
+      }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         stepRef.current(1, e.shiftKey, e.repeat);
@@ -616,7 +620,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         {f.showLabel !== false && (
           <div className="flex w-full items-center pt-2.5 px-3 shrink-0">
               <div className="size-9 shrink-0" />
-              <div className="flex-1 flex justify-center">
+              <div className="flex-1 flex justify-center" style={{
+                opacity: hasUsedArrows ? 0 : 1,
+                transition: "opacity 0.3s ease",
+                pointerEvents: hasUsedArrows ? "none" : "auto",
+              }}>
                 <div className="[letter-spacing:0px] w-fit text-[color(display-p3_0.543_0.543_0.543)] font-sans font-medium text-xs/4.5">
                   Arrow keys ← → to navigate
                 </div>
