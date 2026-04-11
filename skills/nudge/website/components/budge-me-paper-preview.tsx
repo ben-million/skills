@@ -218,6 +218,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [showPrompt, setShowPrompt] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | "mute" | null>(null);
   const [muted, setMuted] = useState(false);
+  const [resetHovered, setResetHovered] = useState(false);
+  const [copyHovered, setCopyHovered] = useState(false);
+  const [muteHovered, setMuteHovered] = useState(false);
+  const muteRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [mutePos, setMutePos] = useState<{ top: number; left: number } | null>(null);
   const slideValuesRef = useRef<number[]>(SLIDES.map(s => s.original));
   const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -226,13 +232,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [boundaryLabelVisible, setBoundaryLabelVisible] = useState(false);
   const boundaryHitsRef = useRef(0);
   const [slideRangeVisible, setSlideRangeVisible] = useState(false);
+  const [slideRangeIdle, setSlideRangeIdle] = useState(true);
   const slideRangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [stripPos, setStripPos] = useState(SLIDES.length * 2);
-  const [stripAnimate, setStripAnimate] = useState(true);
-  const stripResetRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const lastSlideChangeRef = useRef(0);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -272,21 +275,18 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   }, []);
 
   const [slide, setSlide] = useState(0);
+  const slideRef = useRef(0);
   const s = SLIDES[slide];
   const soundOn = f.sound && !muted;
 
-  const goToSlide = useCallback((index: number, repeat = false) => {
-    if (repeat) {
-      const now = performance.now();
-      if (now - lastSlideChangeRef.current < 180) return;
-      lastSlideChangeRef.current = now;
-    }
+  const goToSlide = useCallback((direction: number) => {
     const N = SLIDES.length;
-    const rawDelta = index - slide;
-    index = ((index % N) + N) % N;
-    slideValuesRef.current[slide] = valueRef.current;
-    setSlide(index);
-    const restored = slideValuesRef.current[index];
+    const cur = slideRef.current;
+    const next = ((cur + direction) % N + N) % N;
+    slideValuesRef.current[cur] = valueRef.current;
+    slideRef.current = next;
+    setSlide(next);
+    const restored = slideValuesRef.current[next];
     valueRef.current = restored;
     setValue(restored);
     setTypedRaw(null);
@@ -303,27 +303,14 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
 
     clearTimeout(slideRangeTimeoutRef.current);
     setSlideRangeVisible(true);
+    setSlideRangeIdle(false);
     slideRangeTimeoutRef.current = setTimeout(() => {
       setSlideRangeVisible(false);
+      setTimeout(() => setSlideRangeIdle(true), 400);
     }, 800);
 
-    clearTimeout(stripResetRef.current);
-    setStripPos(prev => {
-      const safeMin = N;
-      const safeMax = N * 4 - 1;
-      if (prev + rawDelta < safeMin || prev + rawDelta > safeMax) {
-        const normalized = N * 2 + ((prev % N) + N) % N;
-        setStripAnimate(false);
-        requestAnimationFrame(() => {
-          setStripAnimate(true);
-          setStripPos(p => p + rawDelta);
-        });
-        return normalized;
-      }
-      setStripAnimate(true);
-      return prev + rawDelta;
-    });
-  }, [slide]);
+
+  }, []);
 
 
   const applyDigitBufferRef = useRef(() => {});
@@ -331,7 +318,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     const num = parseInt(digitBufferRef.current, 10);
     digitBufferRef.current = "";
     if (isNaN(num)) return;
-    const clamped = Math.min(s.max, Math.max(s.min, num));
+    const cs = SLIDES[slideRef.current];
+    const clamped = Math.min(cs.max, Math.max(cs.min, num));
     if (clamped !== valueRef.current) {
       valueRef.current = clamped;
       setValue(clamped);
@@ -343,9 +331,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   };
 
   const step = useCallback((direction: number, shift = false, held = false) => {
+    const cs = SLIDES[slideRef.current];
     const mult = (f.shiftStep && shift) ? 10 : 1;
     const next = valueRef.current + direction * mult;
-    if (next > s.max || next < s.min) {
+    if (next > cs.max || next < cs.min) {
       if (f.boundaryShake) {
         setShaking(true);
         clearTimeout(shakeTimeoutRef.current);
@@ -353,7 +342,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       }
       boundaryHitsRef.current++;
       if (boundaryHitsRef.current >= 20) {
-        const label = next > s.max ? "Max" : "Min";
+        const label = next > cs.max ? "Max" : "Min";
         setBoundaryLabel(label);
         clearTimeout(boundaryLabelTimeoutRef.current);
         clearTimeout(boundaryLabelExitRef.current);
@@ -367,7 +356,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
         }, 400);
       }
-      if (soundOn) playBoundary(next > s.max);
+      if (soundOn) playBoundary(next > cs.max);
       return;
     }
     atBoundary = false;
@@ -382,7 +371,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     valueRef.current = next;
     setValue(valueRef.current);
     if (soundOn) playTick(held);
-  }, [f.shiftStep, f.boundaryShake, soundOn, s.min, s.max]);
+  }, [f.shiftStep, f.boundaryShake, soundOn]);
 
   const triggerNudge = useCallback(
     (dir: "up" | "down") => {
@@ -421,27 +410,30 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   }, [isNudging]);
 
   const reset = useCallback(() => {
+    const cs = SLIDES[slideRef.current];
     const prev = valueRef.current;
-    valueRef.current = s.original;
-    setValue(s.original);
+    valueRef.current = cs.original;
+    setValue(cs.original);
     setIsNudging(true);
     if (f.buttonFeedback) setPressedButton("reset");
     clearTimeout(nudgeTimeoutRef.current);
     nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
     if (soundOn) {
-      if (Math.floor(prev / 10) !== Math.floor(s.original / 10)) {
+      if (Math.floor(prev / 10) !== Math.floor(cs.original / 10)) {
         playDoubleTick();
       } else {
         playTick();
       }
     }
-  }, [f.buttonFeedback, soundOn, s.original]);
+  }, [f.buttonFeedback, soundOn]);
 
   const copy = useCallback(() => {
+    const idx = slideRef.current;
+    const cs = SLIDES[idx];
     const props = ["font-size", "opacity", "padding", "color"];
-    const prop = props[slide] ?? props[0];
-    const val = slide === 3 ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${s.unit}`;
+    const prop = props[idx] ?? props[0];
+    const val = idx === 3 ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${cs.unit}`;
     const prompt = `Set \`${prop}\` to \`${val}\``;
     navigator.clipboard?.writeText(prompt);
     setShowPrompt(true);
@@ -455,7 +447,14 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     }, 800);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
     if (soundOn) playConfirm();
-  }, [f.buttonFeedback, soundOn, slide]);
+  }, [f.buttonFeedback, soundOn]);
+
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const resetRef = useRef(reset);
+  resetRef.current = reset;
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
 
   useEffect(() => {
     if (!f.keyboard) return;
@@ -463,7 +462,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        step(1, e.shiftKey, e.repeat);
+        stepRef.current(1, e.shiftKey, e.repeat);
         setActiveKey("up");
         if (f.expandValue) {
           setIsNudging(true);
@@ -472,7 +471,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         }
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        step(-1, e.shiftKey, e.repeat);
+        stepRef.current(-1, e.shiftKey, e.repeat);
         setActiveKey("down");
         if (f.expandValue) {
           setIsNudging(true);
@@ -484,11 +483,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         if (digitBufferRef.current.length >= 3) return;
         digitBufferRef.current += e.key;
         const num = parseInt(digitBufferRef.current, 10);
+        const ds = SLIDES[slideRef.current];
         if (!isNaN(num)) {
           setTypedRaw(digitBufferRef.current);
           setIsNudging(true);
-          if (soundOn) playTick();
-          if (num >= s.min && num <= s.max) {
+          playTick();
+          if (num >= ds.min && num <= ds.max) {
             valueRef.current = num;
             setValue(num);
           }
@@ -498,8 +498,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         digitTimeoutRef.current = setTimeout(() => {
           const final = parseInt(digitBufferRef.current, 10);
           digitBufferRef.current = "";
-          if (!isNaN(final) && (final < s.min || final > s.max)) {
-            const clamped = Math.min(s.max, Math.max(s.min, final));
+          const ds2 = SLIDES[slideRef.current];
+          if (!isNaN(final) && (final < ds2.min || final > ds2.max)) {
+            const clamped = Math.min(ds2.max, Math.max(ds2.min, final));
             valueRef.current = clamped;
             setValue(clamped);
             setTypedRaw(null);
@@ -508,7 +509,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               clearTimeout(shakeTimeoutRef.current);
               shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
             }
-            if (soundOn) playAlert();
             nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
           } else {
             setTypedRaw(null);
@@ -517,18 +517,18 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         }, 500);
       } else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        reset();
+        resetRef.current();
       } else if (e.key === "Enter") {
         e.preventDefault();
-        copy();
+        copyRef.current();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); }
-        goToSlide(slide - 1, e.repeat);
+        goToSlide(-1);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); }
-        goToSlide(slide + 1, e.repeat);
+        goToSlide(1);
       }
     }
 
@@ -547,7 +547,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       el.removeEventListener("keyup", onKeyUp);
       clearTimeout(nudgeTimeoutRef.current);
     };
-  }, [step, reset, copy, goToSlide, slide, f.keyboard, f.expandValue, f.numberInput, f.boundaryShake, soundOn, s.min, s.max]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const displayNum = typedRaw !== null ? typedRaw : `${value}`;
   const displayUnit = s.unit;
@@ -560,7 +561,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const isColorSlide = slide === 3;
   const targetColor = `hsl(${value}, 70%, 55%)`;
   const nudgeY = 0;
-  const baseScale = f.barPhysics ? (confirmed ? 1.02 : isNudging ? 1 : 0.8) : 1;
+  const baseScale = f.barPhysics ? (confirmed ? 1.02 : (isNudging || !slideRangeIdle) ? 1 : 0.8) : 1;
 
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -573,6 +574,30 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
 
   return (
     <>
+    <div ref={wrapperRef} className="relative">
+    {f.showLabel !== false && mutePos && (
+      <div
+        style={{
+          position: "absolute",
+          bottom: `calc(100% - ${mutePos.top}px)`,
+          left: mutePos.left,
+          zIndex: 10,
+          pointerEvents: "none",
+          transform: `translateX(-50%) scale(${muteHovered ? 1 : 0.85})`,
+          transformOrigin: "bottom center",
+          opacity: muteHovered ? 1 : 0,
+          transition: muteHovered
+            ? "opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)"
+            : "opacity 0.1s ease, transform 0.1s ease",
+        }}
+      >
+        <div className="[font-synthesis:none] flex flex-col items-center gap-0 px-2.25 py-0.75 rounded-full justify-center bg-[color(display-p3_0.246_0.246_0.246)] antialiased">
+          <div className="[letter-spacing:0px] w-max text-[color(display-p3_1_1_1)] font-sans font-medium text-xs/4.5">
+            {muted ? "Unmute" : "Mute"}
+          </div>
+        </div>
+      </div>
+    )}
     <div
       ref={containerRef}
       tabIndex={0}
@@ -581,27 +606,56 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%]${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
           <div className="flex w-full items-center justify-end pt-2.5 px-3 shrink-0">
-            <div
-              className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
-              onClick={() => {
-                setMuted(m => !m);
-                if (f.buttonFeedback) { setPressedButton("mute"); setTimeout(() => setPressedButton(null), 70); }
-              }}
-              style={f.buttonFeedback ? {
-                transform: pressedButton === "mute" ? "scale(0.9)" : "scale(1)",
-                transition: pressedButton === "mute"
-                  ? "transform 0.03s linear"
-                  : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-              } : undefined}
-            >
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-colors duration-200" style={{ width: 18, height: "auto", flexShrink: 0 }}>
-                {muted ? (
-                  <path fillRule="evenodd" clipRule="evenodd" d="M14 6C14 4.352 12.118 3.411 10.8 4.4L6.712 7.466L4.299 7.225C2.532 7.048 1 8.435 1 10.21V13.79C1 15.565 2.532 16.952 4.299 16.775L6.712 16.534L10.8 19.6C12.118 20.589 14 19.648 14 18V6ZM22.707 8.793C23.098 9.184 23.098 9.817 22.707 10.207L20.914 12L22.707 13.793C23.098 14.184 23.098 14.817 22.707 15.207C22.317 15.598 21.683 15.598 21.293 15.207L19.5 13.414L17.707 15.207C17.317 15.598 16.683 15.598 16.293 15.207C15.902 14.817 15.902 14.184 16.293 13.793L18.086 12L16.293 10.207C15.902 9.817 15.902 9.184 16.293 8.793C16.683 8.403 17.317 8.403 17.707 8.793L19.5 10.586L21.293 8.793C21.683 8.403 22.317 8.403 22.707 8.793Z" className="fill-[#B0B0B0] group-hover:fill-[#777]" />
-                ) : (
-                  <path fillRule="evenodd" clipRule="evenodd" d="M14 5.869C14 4.271 12.22 3.318 10.891 4.205L6.697 7H4C2.343 7 1 8.343 1 10V14C1 15.657 2.343 17 4 17H6.697L10.891 19.796C12.22 20.682 14 19.729 14 18.132V5.869ZM22.042 8.466C22.676 9.549 23.007 10.783 23 12.037C22.993 13.292 22.649 14.522 22.004 15.598C21.359 16.675 20.437 17.558 19.334 18.155C18.848 18.418 18.241 18.238 17.978 17.752C17.715 17.267 17.895 16.66 18.381 16.397C19.169 15.97 19.828 15.339 20.289 14.57C20.75 13.802 20.995 12.923 21 12.027C21.005 11.13 20.768 10.249 20.316 9.476C19.863 8.702 19.211 8.064 18.428 7.629C17.945 7.361 17.771 6.752 18.039 6.269C18.307 5.787 18.916 5.613 19.399 5.881C20.496 6.49 21.409 7.383 22.042 8.466ZM19 12.016C19.003 11.478 18.861 10.95 18.59 10.485C18.318 10.021 17.927 9.639 17.457 9.377C16.974 9.109 16.365 9.283 16.097 9.766C15.829 10.249 16.003 10.858 16.486 11.126C16.642 11.213 16.773 11.34 16.863 11.495C16.954 11.65 17.001 11.826 17 12.005C16.999 12.185 16.95 12.36 16.858 12.514C16.766 12.668 16.634 12.794 16.476 12.879C15.991 13.142 15.81 13.749 16.073 14.235C16.336 14.721 16.943 14.901 17.429 14.638C17.901 14.382 18.297 14.003 18.573 13.542C18.85 13.081 18.997 12.554 19 12.016Z" className="fill-[#B0B0B0] group-hover:fill-[#777]" />
-                )}
-              </svg>
-            </div>
+              <div
+                ref={muteRef}
+                className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+                onClick={() => {
+                  setMuted(m => !m);
+                  if (f.buttonFeedback) { setPressedButton("mute"); setTimeout(() => setPressedButton(null), 70); }
+                }}
+                onPointerEnter={() => {
+                  if (muteRef.current && wrapperRef.current) {
+                    const btn = muteRef.current.getBoundingClientRect();
+                    const wrap = wrapperRef.current.getBoundingClientRect();
+                    setMutePos({
+                      top: btn.top - wrap.top - 6,
+                      left: btn.left - wrap.left + btn.width / 2,
+                    });
+                  }
+                  setMuteHovered(true);
+                }}
+                onPointerLeave={() => setMuteHovered(false)}
+                style={f.buttonFeedback ? {
+                  transform: pressedButton === "mute" ? "scale(0.9)" : "scale(1)",
+                  transition: pressedButton === "mute"
+                    ? "transform 0.03s linear"
+                    : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+                } : undefined}
+              >
+                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-colors duration-200" style={{ width: 18, height: "auto", flexShrink: 0 }}>
+                  {muted ? (
+                    <>
+                      <path fillRule="evenodd" clipRule="evenodd" d="M14 6C14 4.352 12.118 3.411 10.8 4.4L6.712 7.466L4.299 7.225C2.532 7.048 1 8.435 1 10.21V13.79C1 15.565 2.532 16.952 4.299 16.775L6.712 16.534L10.8 19.6C12.118 20.589 14 19.648 14 18V6Z" className="fill-[#B0B0B0] group-hover:fill-[#777]" />
+                      <path fillRule="evenodd" clipRule="evenodd" d="M22.707 8.793C23.098 9.184 23.098 9.817 22.707 10.207L20.914 12L22.707 13.793C23.098 14.184 23.098 14.817 22.707 15.207C22.317 15.598 21.683 15.598 21.293 15.207L19.5 13.414L17.707 15.207C17.317 15.598 16.683 15.598 16.293 15.207C15.902 14.817 15.902 14.184 16.293 13.793L18.086 12L16.293 10.207C15.902 9.817 15.902 9.184 16.293 8.793C16.683 8.403 17.317 8.403 17.707 8.793L19.5 10.586L21.293 8.793C21.683 8.403 22.317 8.403 22.707 8.793Z" className="fill-[#B0B0B0] group-hover:fill-[#777]"
+                        style={{
+                          transform: muteHovered ? "translate(1.5px, 0)" : "translate(0, 0)",
+                          transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <path fillRule="evenodd" clipRule="evenodd" d="M14 5.869C14 4.271 12.22 3.318 10.891 4.205L6.697 7H4C2.343 7 1 8.343 1 10V14C1 15.657 2.343 17 4 17H6.697L10.891 19.796C12.22 20.682 14 19.729 14 18.132V5.869Z" className="fill-[#B0B0B0] group-hover:fill-[#777]" />
+                      <path fillRule="evenodd" clipRule="evenodd" d="M22.042 8.466C22.676 9.549 23.007 10.783 23 12.037C22.993 13.292 22.649 14.522 22.004 15.598C21.359 16.675 20.437 17.558 19.334 18.155C18.848 18.418 18.241 18.238 17.978 17.752C17.715 17.267 17.895 16.66 18.381 16.397C19.169 15.97 19.828 15.339 20.289 14.57C20.75 13.802 20.995 12.923 21 12.027C21.005 11.13 20.768 10.249 20.316 9.476C19.863 8.702 19.211 8.064 18.428 7.629C17.945 7.361 17.771 6.752 18.039 6.269C18.307 5.787 18.916 5.613 19.399 5.881C20.496 6.49 21.409 7.383 22.042 8.466ZM19 12.016C19.003 11.478 18.861 10.95 18.59 10.485C18.318 10.021 17.927 9.639 17.457 9.377C16.974 9.109 16.365 9.283 16.097 9.766C15.829 10.249 16.003 10.858 16.486 11.126C16.642 11.213 16.773 11.34 16.863 11.495C16.954 11.65 17.001 11.826 17 12.005C16.999 12.185 16.95 12.36 16.858 12.514C16.766 12.668 16.634 12.794 16.476 12.879C15.991 13.142 15.81 13.749 16.073 14.235C16.336 14.721 16.943 14.901 17.429 14.638C17.901 14.382 18.297 14.003 18.573 13.542C18.85 13.081 18.997 12.554 19 12.016Z" className="fill-[#B0B0B0] group-hover:fill-[#777]"
+                        style={{
+                          transform: muteHovered ? "translate(1.5px, 0)" : "translate(0, 0)",
+                          transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+                        }}
+                      />
+                    </>
+                  )}
+                </svg>
+              </div>
           </div>
         )}
         {f.showText !== false && (
@@ -662,7 +716,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             WebkitFontSmoothing: "antialiased",
             userSelect: "none",
             transform: `translateY(${nudgeY}px) scale(${baseScale})`,
-            opacity: f.idleOpacity ? (isNudging || confirmed ? 1 : 0.8) : 1,
+            opacity: f.idleOpacity ? (isNudging || confirmed || !slideRangeIdle ? 1 : 0.8) : 1,
             transition: f.barPhysics
               ? (confirmed
                   ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), opacity 0.2s ease"
@@ -680,44 +734,24 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             bottom: "100%",
             left: "50%",
             pointerEvents: "none",
-            transform: `scale(${1 / baseScale}) translateX(-50%)`,
+            transform: `scale(${1 / baseScale}) translateX(-50%) translateY(${slideRangeVisible ? 0 : 8}px)`,
             transformOrigin: "top left",
             paddingBottom: 10,
             opacity: slideRangeVisible ? 1 : 0,
             transition: slideRangeVisible
-              ? "opacity 0.2s ease"
-              : "opacity 0.3s ease 0.1s",
+              ? "opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+              : "opacity 0.25s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
           }}>
-            <div style={{
-              overflow: "hidden",
-              position: "relative",
-              height: 16,
-              width: 80,
-              maskImage: "linear-gradient(to right, transparent, black 30%, black 70%, transparent)",
-              WebkitMaskImage: "linear-gradient(to right, transparent, black 30%, black 70%, transparent)",
+            <span style={{
+              fontFamily: FONT,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#666",
+              letterSpacing: "0.01em",
+              whiteSpace: "nowrap",
             }}>
-              <div style={{
-                display: "flex",
-                transform: `translateX(${-stripPos * 80}px)`,
-                transition: stripAnimate ? "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)" : "none",
-              }}>
-                {Array.from({ length: SLIDES.length * 5 }, (_, i) => (
-                  <span key={i} style={{
-                    width: 80,
-                    flexShrink: 0,
-                    textAlign: "center",
-                    fontFamily: FONT,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: "#666",
-                    letterSpacing: "0.01em",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {SLIDES[((i % SLIDES.length) + SLIDES.length) % SLIDES.length].label}
-                  </span>
-                ))}
-              </div>
-            </div>
+              {SLIDES[slide].label}
+            </span>
           </div>
           <div style={{
             position: "absolute",
@@ -847,41 +881,103 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
 
       {f.showButtons !== false && (
         <>
-          <button
-            type="button"
-            onClick={reset}
-            className="cursor-pointer absolute bottom-3 left-3 flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
-            style={f.buttonFeedback ? {
-              transform: pressedButton === "reset" ? "scale(0.9)" : "scale(1)",
-              transition: pressedButton === "reset"
-                ? "transform 0.03s linear"
-                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-            } : undefined}
-          >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: "auto", flexShrink: 0 }}>
-              <path fillRule="evenodd" clipRule="evenodd" d="M5 3C5 2.448 4.552 2 4 2C3.447 2 3 2.448 3 3V9C3 9.552 3.447 10 4 10H10C10.552 10 11 9.552 11 9C11 8.448 10.552 8 10 8H5.755C6.656 6.875 7.85 6.006 9.219 5.499C11.046 4.821 13.058 4.834 14.877 5.535C16.696 6.236 18.196 7.577 19.096 9.306C19.996 11.035 20.234 13.033 19.765 14.924C19.296 16.816 18.153 18.472 16.55 19.58C14.947 20.689 12.994 21.174 11.058 20.944C9.123 20.715 7.338 19.787 6.038 18.334C4.738 16.882 4.014 15.005 4 13.056C3.996 12.504 3.545 12.059 2.993 12.063C2.441 12.067 1.996 12.518 2 13.07C2.017 15.506 2.923 17.852 4.548 19.668C6.172 21.484 8.404 22.644 10.823 22.93C13.242 23.217 15.683 22.611 17.687 21.225C19.691 19.84 21.12 17.77 21.706 15.405C22.292 13.041 21.995 10.543 20.87 8.382C19.745 6.221 17.869 4.545 15.596 3.669C13.323 2.793 10.808 2.777 8.524 3.624C7.194 4.116 5.996 4.882 5 5.859V3Z" fill="#B0B0B0" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={copy}
-            className="cursor-pointer absolute bottom-3 right-3 flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
-            style={f.buttonFeedback ? {
-              transform: pressedButton === "copy" ? "scale(0.9)" : "scale(1)",
-              transition: pressedButton === "copy"
-                ? "transform 0.03s linear"
-                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-            } : undefined}
-          >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: "auto", flexShrink: 0 }}>
-              <path fillRule="evenodd" clipRule="evenodd" d="M9.942 2C8.65 2 7.504 2.826 7.096 4.051L7.051 4.184C6.877 4.708 7.16 5.274 7.684 5.449C8.208 5.623 8.774 5.34 8.949 4.816L8.993 4.684C9.129 4.275 9.511 4 9.942 4H19C19.552 4 20 4.448 20 5V14.059C20 14.489 19.725 14.871 19.316 15.007L19.184 15.051C18.66 15.226 18.377 15.792 18.551 16.316C18.726 16.84 19.292 17.123 19.816 16.949L19.949 16.904C21.174 16.496 22 15.35 22 14.059V5C22 3.343 20.657 2 19 2H9.942ZM5 7C3.343 7 2 8.343 2 10V19C2 20.657 3.343 22 5 22H14C15.657 22 17 20.657 17 19V10C17 8.343 15.657 7 14 7H5ZM4 10C4 9.448 4.448 9 5 9H14C14.552 9 15 9.448 15 10V19C15 19.552 14.552 20 14 20H5C4.448 20 4 19.552 4 19V10Z" fill="#B0B0B0" />
-            </svg>
-          </button>
+          <div className="absolute bottom-3 left-3">
+            <div
+              style={{
+                position: "absolute",
+                bottom: "100%",
+                left: "50%",
+                transform: `translateX(-50%) scale(${resetHovered ? 1 : 0.85})`,
+                transformOrigin: "bottom center",
+                marginBottom: 6,
+                opacity: resetHovered ? 1 : 0,
+                pointerEvents: "none",
+                transition: resetHovered
+                  ? "opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)"
+                  : "opacity 0.1s ease, transform 0.1s ease",
+              }}
+            >
+              <div className="[font-synthesis:none] flex flex-col items-center gap-0 px-2.25 py-0.75 rounded-full justify-center bg-[color(display-p3_0.246_0.246_0.246)] antialiased">
+                <div className="[letter-spacing:0px] w-max text-[color(display-p3_1_1_1)] font-sans font-medium text-xs/4.5">
+                  Reset
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={reset}
+              onPointerEnter={() => setResetHovered(true)}
+              onPointerLeave={() => setResetHovered(false)}
+              className="cursor-pointer flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
+              style={f.buttonFeedback ? {
+                transform: pressedButton === "reset" ? "scale(0.9)" : "scale(1)",
+                transition: pressedButton === "reset"
+                  ? "transform 0.03s linear"
+                  : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : undefined}
+            >
+              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{
+                width: 18,
+                height: "auto",
+                flexShrink: 0,
+                transform: resetHovered ? "rotate(-30deg)" : "rotate(0deg)",
+                transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              }}>
+                <path fillRule="evenodd" clipRule="evenodd" d="M5 3C5 2.448 4.552 2 4 2C3.447 2 3 2.448 3 3V9C3 9.552 3.447 10 4 10H10C10.552 10 11 9.552 11 9C11 8.448 10.552 8 10 8H5.755C6.656 6.875 7.85 6.006 9.219 5.499C11.046 4.821 13.058 4.834 14.877 5.535C16.696 6.236 18.196 7.577 19.096 9.306C19.996 11.035 20.234 13.033 19.765 14.924C19.296 16.816 18.153 18.472 16.55 19.58C14.947 20.689 12.994 21.174 11.058 20.944C9.123 20.715 7.338 19.787 6.038 18.334C4.738 16.882 4.014 15.005 4 13.056C3.996 12.504 3.545 12.059 2.993 12.063C2.441 12.067 1.996 12.518 2 13.07C2.017 15.506 2.923 17.852 4.548 19.668C6.172 21.484 8.404 22.644 10.823 22.93C13.242 23.217 15.683 22.611 17.687 21.225C19.691 19.84 21.12 17.77 21.706 15.405C22.292 13.041 21.995 10.543 20.87 8.382C19.745 6.221 17.869 4.545 15.596 3.669C13.323 2.793 10.808 2.777 8.524 3.624C7.194 4.116 5.996 4.882 5 5.859V3Z" fill="#B0B0B0" />
+              </svg>
+            </button>
+          </div>
+          <div className="absolute bottom-3 right-3">
+            <div
+              style={{
+                position: "absolute",
+                bottom: "100%",
+                left: "50%",
+                transform: `translateX(-50%) scale(${copyHovered ? 1 : 0.85})`,
+                transformOrigin: "bottom center",
+                marginBottom: 6,
+                opacity: copyHovered ? 1 : 0,
+                pointerEvents: "none",
+                transition: copyHovered
+                  ? "opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)"
+                  : "opacity 0.1s ease, transform 0.1s ease",
+              }}
+            >
+              <div className="[font-synthesis:none] flex flex-col items-center gap-0 px-2.25 py-0.75 rounded-full justify-center bg-[color(display-p3_0.246_0.246_0.246)] antialiased">
+                <div className="[letter-spacing:0px] w-max text-[color(display-p3_1_1_1)] font-sans font-medium text-xs/4.5">
+                  Copy
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={copy}
+              onPointerEnter={() => setCopyHovered(true)}
+              onPointerLeave={() => setCopyHovered(false)}
+              className="cursor-pointer flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
+              style={f.buttonFeedback ? {
+                transform: pressedButton === "copy" ? "scale(0.9)" : "scale(1)",
+                transition: pressedButton === "copy"
+                  ? "transform 0.03s linear"
+                  : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : undefined}
+            >
+              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: "auto", flexShrink: 0 }}>
+                <path fillRule="evenodd" clipRule="evenodd" d="M5 7C3.343 7 2 8.343 2 10V19C2 20.657 3.343 22 5 22H14C15.657 22 17 20.657 17 19V10C17 8.343 15.657 7 14 7H5ZM4 10C4 9.448 4.448 9 5 9H14C14.552 9 15 9.448 15 10V19C15 19.552 14.552 20 14 20H5C4.448 20 4 19.552 4 19V10Z" fill="#B0B0B0" />
+                <path fillRule="evenodd" clipRule="evenodd" d="M9.942 2C8.65 2 7.504 2.826 7.096 4.051L7.051 4.184C6.877 4.708 7.16 5.274 7.684 5.449C8.208 5.623 8.774 5.34 8.949 4.816L8.993 4.684C9.129 4.275 9.511 4 9.942 4H19C19.552 4 20 4.448 20 5V14.059C20 14.489 19.725 14.871 19.316 15.007L19.184 15.051C18.66 15.226 18.377 15.792 18.551 16.316C18.726 16.84 19.292 17.123 19.816 16.949L19.949 16.904C21.174 16.496 22 15.35 22 14.059V5C22 3.343 20.657 2 19 2H9.942Z" fill="#B0B0B0"
+                  style={{
+                    transform: copyHovered ? "translate(-1.5px, -1.5px)" : "translate(0, 0)",
+                    transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+                  }}
+                />
+              </svg>
+            </button>
+          </div>
         </>
       )}
     </div>
-    {showPrompt && (
-      <div
+    </div>
+      {showPrompt && <div
         style={{
           marginTop: 16,
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -931,8 +1027,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             {`${value}${s.unit}`}
           </Calligraph>
         )}
-      </div>
-    )}
+      </div>}
     </>
   );
 }
