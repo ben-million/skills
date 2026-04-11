@@ -622,7 +622,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               <div className="size-9 shrink-0" />
               <div className="flex-1 flex justify-center" style={{
                 opacity: hasUsedArrows ? 0 : 1,
-                transition: "opacity 0.3s ease",
+                filter: hasUsedArrows ? "blur(4px)" : "blur(0px)",
+                transition: "opacity 0.3s ease, filter 0.3s ease",
                 pointerEvents: hasUsedArrows ? "none" : "auto",
               }}>
                 <div className="[letter-spacing:0px] w-fit text-[color(display-p3_0.543_0.543_0.543)] font-sans font-medium text-xs/4.5">
@@ -761,9 +762,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             transformOrigin: "top left",
             paddingBottom: 10,
             opacity: slideRangeVisible ? 1 : 0,
+            filter: slideRangeVisible ? "blur(0px)" : "blur(4px)",
             transition: slideRangeVisible
-              ? "opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
-              : "opacity 0.25s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              ? "opacity 0.2s ease, filter 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+              : "opacity 0.25s ease, filter 0.25s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
           }}>
             <span style={{
               fontFamily: FONT,
