@@ -225,6 +225,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [boundaryLabel, setBoundaryLabel] = useState<"Min" | "Max" | null>(null);
   const [boundaryLabelVisible, setBoundaryLabelVisible] = useState(false);
   const boundaryHitsRef = useRef(0);
+  const [slideRangeVisible, setSlideRangeVisible] = useState(false);
+  const slideRangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const slideRangeExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -287,6 +290,18 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     clearTimeout(nudgeTimeoutRef.current);
     clearTimeout(shakeTimeoutRef.current);
     clearTimeout(confirmedTimeoutRef.current);
+
+    clearTimeout(slideRangeTimeoutRef.current);
+    clearTimeout(slideRangeExitRef.current);
+    setSlideRangeVisible(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSlideRangeVisible(true);
+      });
+    });
+    slideRangeTimeoutRef.current = setTimeout(() => {
+      setSlideRangeVisible(false);
+    }, 800);
   }, [slide]);
 
 
@@ -635,29 +650,31 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               : "none",
           }}
         >
-          {boundaryLabel && (
-            <div style={{
-              position: "absolute",
-              bottom: "100%",
-              left: 16,
-              display: "flex",
-              justifyContent: "flex-start",
-              paddingBottom: 4,
-              pointerEvents: "none",
-              opacity: boundaryLabelVisible ? 1 : 0,
-              transform: boundaryLabelVisible ? "translateY(0)" : "translateY(8px)",
-              transition: "opacity 0.25s ease, transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+          <div style={{
+            position: "absolute",
+            bottom: "100%",
+            left: 0,
+            right: 0,
+            display: "flex",
+            justifyContent: "center",
+            paddingBottom: 6,
+            pointerEvents: "none",
+            opacity: slideRangeVisible ? 1 : 0,
+            transform: `scale(${1 / baseScale}) ${slideRangeVisible ? "translateY(0)" : "translateY(5px)"}`,
+            transition: slideRangeVisible
+              ? "opacity 0.2s ease, transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)"
+              : "opacity 0.3s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+          }}>
+            <span style={{
+              fontFamily: FONT,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#999",
+              letterSpacing: "0.01em",
             }}>
-              <span style={{
-                fontFamily: FONT,
-                fontSize: 13,
-                fontWeight: 500,
-                color: "#161616",
-              }}>
-                {boundaryLabel}
-              </span>
-            </div>
-          )}
+              {s.label}
+            </span>
+          </div>
           <div style={{
             position: "absolute",
             inset: 0,
@@ -785,21 +802,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       </div>
 
       {f.showButtons !== false && (
-        <div className="flex items-center justify-between h-15 shrink-0 px-3.5">
-          <div
-            onClick={() => { if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); } if (soundOn) playTick(); goToSlide(slide - 1); }}
-            className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
-            style={f.buttonFeedback ? {
-              transform: pressedButton === "prev" ? "translateX(-2px) scale(0.9)" : "translateX(0) scale(1)",
-              transition: pressedButton === "prev"
-                ? "transform 0.05s cubic-bezier(0.2, 0, 0, 1.6)"
-                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-            } : undefined}
-          >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px', flexShrink: 0, marginLeft: '-1.5px' }}>
-              <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" />
-            </svg>
-          </div>
+        <div className="flex items-center justify-center h-15 shrink-0 px-3.5">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -837,20 +840,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 ↵
               </div>
             </button>
-          </div>
-          <div
-            onClick={() => { if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); } if (soundOn) playTick(); goToSlide(slide + 1); }}
-            className="flex items-center justify-center rounded-full overflow-hidden bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-8 cursor-pointer"
-            style={f.buttonFeedback ? {
-              transform: pressedButton === "next" ? "translateX(2px) scale(0.9)" : "translateX(0) scale(1)",
-              transition: pressedButton === "next"
-                ? "transform 0.05s cubic-bezier(0.2, 0, 0, 1.6)"
-                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-            } : undefined}
-          >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ rotate: '180deg', width: '20px', height: '20px', flexShrink: 0, transformOrigin: '50% 50%', marginRight: '-1.5px' }}>
-              <path fillRule="evenodd" clipRule="evenodd" d="M14.707 16.707C15.098 16.317 15.098 15.683 14.707 15.293L11.414 12L14.707 8.707C15.098 8.317 15.098 7.683 14.707 7.293C14.317 6.902 13.683 6.902 13.293 7.293L9.293 11.293C9.105 11.48 9 11.735 9 12C9 12.265 9.105 12.52 9.293 12.707L13.293 16.707C13.683 17.098 14.317 17.098 14.707 16.707Z" fill="#000000" style={{ transformOrigin: '50% 50%' }} />
-            </svg>
           </div>
         </div>
       )}
