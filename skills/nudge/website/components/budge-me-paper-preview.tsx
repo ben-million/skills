@@ -216,7 +216,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [isNudging, setIsNudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | null>(null);
+  const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | "mute" | null>(null);
   const [muted, setMuted] = useState(false);
   const slideValuesRef = useRef<number[]>(SLIDES.map(s => s.original));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -227,9 +227,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const boundaryHitsRef = useRef(0);
   const [slideRangeVisible, setSlideRangeVisible] = useState(false);
   const slideRangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const slideRangeExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [stripPos, setStripPos] = useState(SLIDES.length * 2);
+  const [stripAnimate, setStripAnimate] = useState(true);
+  const stripResetRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastSlideChangeRef = useRef(0);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -272,8 +275,15 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const s = SLIDES[slide];
   const soundOn = f.sound && !muted;
 
-  const goToSlide = useCallback((index: number) => {
-    index = ((index % SLIDES.length) + SLIDES.length) % SLIDES.length;
+  const goToSlide = useCallback((index: number, repeat = false) => {
+    if (repeat) {
+      const now = performance.now();
+      if (now - lastSlideChangeRef.current < 180) return;
+      lastSlideChangeRef.current = now;
+    }
+    const N = SLIDES.length;
+    const rawDelta = index - slide;
+    index = ((index % N) + N) % N;
     slideValuesRef.current[slide] = valueRef.current;
     setSlide(index);
     const restored = slideValuesRef.current[index];
@@ -292,16 +302,27 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     clearTimeout(confirmedTimeoutRef.current);
 
     clearTimeout(slideRangeTimeoutRef.current);
-    clearTimeout(slideRangeExitRef.current);
-    setSlideRangeVisible(false);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setSlideRangeVisible(true);
-      });
-    });
+    setSlideRangeVisible(true);
     slideRangeTimeoutRef.current = setTimeout(() => {
       setSlideRangeVisible(false);
     }, 800);
+
+    clearTimeout(stripResetRef.current);
+    setStripPos(prev => {
+      const safeMin = N;
+      const safeMax = N * 4 - 1;
+      if (prev + rawDelta < safeMin || prev + rawDelta > safeMax) {
+        const normalized = N * 2 + ((prev % N) + N) % N;
+        setStripAnimate(false);
+        requestAnimationFrame(() => {
+          setStripAnimate(true);
+          setStripPos(p => p + rawDelta);
+        });
+        return normalized;
+      }
+      setStripAnimate(true);
+      return prev + rawDelta;
+    });
   }, [slide]);
 
 
@@ -503,11 +524,11 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (f.buttonFeedback) { setPressedButton("prev"); setTimeout(() => setPressedButton(null), 70); }
-        goToSlide(slide - 1);
+        goToSlide(slide - 1, e.repeat);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         if (f.buttonFeedback) { setPressedButton("next"); setTimeout(() => setPressedButton(null), 70); }
-        goToSlide(slide + 1);
+        goToSlide(slide + 1, e.repeat);
       }
     }
 
@@ -556,17 +577,22 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       ref={containerRef}
       tabIndex={0}
       onPointerDown={() => containerRef.current?.focus()}
-      className="budge-me-paper-preview [font-synthesis:none] flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[color(display-p3_0.991_0.991_0.991)] border border-solid border-[color(display-p3_1_1_1)] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
-      <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%] gap-7${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
+      className="budge-me-paper-preview [font-synthesis:none] relative flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[color(display-p3_0.991_0.991_0.991)] border border-solid border-[color(display-p3_1_1_1)] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
+      <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%]${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
-          <div className="flex w-full items-center pt-2.5 px-3 shrink-0">
-            <div className="size-9 shrink-0" />
-            <div className="tracking-[0.13em] font-sans font-semibold text-xs/4.5 text-[#909090] text-center uppercase flex-1">
-{s.label}
-            </div>
+          <div className="flex w-full items-center justify-end pt-2.5 px-3 shrink-0">
             <div
               className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
-              onClick={() => setMuted(m => !m)}
+              onClick={() => {
+                setMuted(m => !m);
+                if (f.buttonFeedback) { setPressedButton("mute"); setTimeout(() => setPressedButton(null), 70); }
+              }}
+              style={f.buttonFeedback ? {
+                transform: pressedButton === "mute" ? "scale(0.9)" : "scale(1)",
+                transition: pressedButton === "mute"
+                  ? "transform 0.03s linear"
+                  : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              } : undefined}
             >
               <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-colors duration-200" style={{ width: 18, height: "auto", flexShrink: 0 }}>
                 {muted ? (
@@ -631,7 +657,6 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             justifyContent: "center",
             borderRadius: 9999,
             padding: "0 16px",
-            ...(f.showText === false ? { marginTop: "auto" } : {}),
             marginBottom: 24,
             fontSynthesis: "none",
             WebkitFontSmoothing: "antialiased",
@@ -653,27 +678,46 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           <div style={{
             position: "absolute",
             bottom: "100%",
-            left: 0,
-            right: 0,
-            display: "flex",
-            justifyContent: "center",
-            paddingBottom: 6,
+            left: "50%",
             pointerEvents: "none",
+            transform: `scale(${1 / baseScale}) translateX(-50%)`,
+            transformOrigin: "top left",
+            paddingBottom: 10,
             opacity: slideRangeVisible ? 1 : 0,
-            transform: `scale(${1 / baseScale}) ${slideRangeVisible ? "translateY(0)" : "translateY(5px)"}`,
             transition: slideRangeVisible
-              ? "opacity 0.2s ease, transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)"
-              : "opacity 0.3s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+              ? "opacity 0.2s ease"
+              : "opacity 0.3s ease 0.1s",
           }}>
-            <span style={{
-              fontFamily: FONT,
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#999",
-              letterSpacing: "0.01em",
+            <div style={{
+              overflow: "hidden",
+              position: "relative",
+              height: 16,
+              width: 80,
+              maskImage: "linear-gradient(to right, transparent, black 30%, black 70%, transparent)",
+              WebkitMaskImage: "linear-gradient(to right, transparent, black 30%, black 70%, transparent)",
             }}>
-              {s.label}
-            </span>
+              <div style={{
+                display: "flex",
+                transform: `translateX(${-stripPos * 80}px)`,
+                transition: stripAnimate ? "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)" : "none",
+              }}>
+                {Array.from({ length: SLIDES.length * 5 }, (_, i) => (
+                  <span key={i} style={{
+                    width: 80,
+                    flexShrink: 0,
+                    textAlign: "center",
+                    fontFamily: FONT,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "#666",
+                    letterSpacing: "0.01em",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {SLIDES[((i % SLIDES.length) + SLIDES.length) % SLIDES.length].label}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
           <div style={{
             position: "absolute",
@@ -802,46 +846,38 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       </div>
 
       {f.showButtons !== false && (
-        <div className="flex items-center justify-center h-15 shrink-0 px-3.5">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={reset}
-              className="cursor-pointer flex items-center justify-center px-4 h-8 rounded-full gap-1.5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
-              style={f.buttonFeedback ? {
-                transform: pressedButton === "reset" ? "scale(0.975)" : "scale(1)",
-                transition: pressedButton === "reset"
-                  ? "transform 0.03s linear"
-                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-              } : undefined}
-            >
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[14px]/4.5">
-                Reset
-              </div>
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[14px]/4.5">
-                R
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={copy}
-              className="cursor-pointer flex items-center justify-center px-4 h-8 rounded-full gap-1.5 bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0"
-              style={f.buttonFeedback ? {
-                transform: pressedButton === "copy" ? "scale(0.975)" : "scale(1)",
-                transition: pressedButton === "copy"
-                  ? "transform 0.03s linear"
-                  : "transform 0.1s cubic-bezier(0.32, 0.72, 0, 1)",
-              } : undefined}
-            >
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#323232] font-sans font-medium shrink-0 text-[14px]/4.5">
-                Copy
-              </div>
-              <div className="[letter-spacing:0px] w-max left-0 top-0 [white-space-collapse:preserve] relative text-[#919191] font-sans font-medium shrink-0 text-[14px]/4.5">
-                ↵
-              </div>
-            </button>
-          </div>
-        </div>
+        <>
+          <button
+            type="button"
+            onClick={reset}
+            className="cursor-pointer absolute bottom-3 left-3 flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
+            style={f.buttonFeedback ? {
+              transform: pressedButton === "reset" ? "scale(0.9)" : "scale(1)",
+              transition: pressedButton === "reset"
+                ? "transform 0.03s linear"
+                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+            } : undefined}
+          >
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: "auto", flexShrink: 0 }}>
+              <path fillRule="evenodd" clipRule="evenodd" d="M5 3C5 2.448 4.552 2 4 2C3.447 2 3 2.448 3 3V9C3 9.552 3.447 10 4 10H10C10.552 10 11 9.552 11 9C11 8.448 10.552 8 10 8H5.755C6.656 6.875 7.85 6.006 9.219 5.499C11.046 4.821 13.058 4.834 14.877 5.535C16.696 6.236 18.196 7.577 19.096 9.306C19.996 11.035 20.234 13.033 19.765 14.924C19.296 16.816 18.153 18.472 16.55 19.58C14.947 20.689 12.994 21.174 11.058 20.944C9.123 20.715 7.338 19.787 6.038 18.334C4.738 16.882 4.014 15.005 4 13.056C3.996 12.504 3.545 12.059 2.993 12.063C2.441 12.067 1.996 12.518 2 13.07C2.017 15.506 2.923 17.852 4.548 19.668C6.172 21.484 8.404 22.644 10.823 22.93C13.242 23.217 15.683 22.611 17.687 21.225C19.691 19.84 21.12 17.77 21.706 15.405C22.292 13.041 21.995 10.543 20.87 8.382C19.745 6.221 17.869 4.545 15.596 3.669C13.323 2.793 10.808 2.777 8.524 3.624C7.194 4.116 5.996 4.882 5 5.859V3Z" fill="#B0B0B0" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={copy}
+            className="cursor-pointer absolute bottom-3 right-3 flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
+            style={f.buttonFeedback ? {
+              transform: pressedButton === "copy" ? "scale(0.9)" : "scale(1)",
+              transition: pressedButton === "copy"
+                ? "transform 0.03s linear"
+                : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+            } : undefined}
+          >
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: "auto", flexShrink: 0 }}>
+              <path fillRule="evenodd" clipRule="evenodd" d="M9.942 2C8.65 2 7.504 2.826 7.096 4.051L7.051 4.184C6.877 4.708 7.16 5.274 7.684 5.449C8.208 5.623 8.774 5.34 8.949 4.816L8.993 4.684C9.129 4.275 9.511 4 9.942 4H19C19.552 4 20 4.448 20 5V14.059C20 14.489 19.725 14.871 19.316 15.007L19.184 15.051C18.66 15.226 18.377 15.792 18.551 16.316C18.726 16.84 19.292 17.123 19.816 16.949L19.949 16.904C21.174 16.496 22 15.35 22 14.059V5C22 3.343 20.657 2 19 2H9.942ZM5 7C3.343 7 2 8.343 2 10V19C2 20.657 3.343 22 5 22H14C15.657 22 17 20.657 17 19V10C17 8.343 15.657 7 14 7H5ZM4 10C4 9.448 4.448 9 5 9H14C14.552 9 15 9.448 15 10V19C15 19.552 14.552 20 14 20H5C4.448 20 4 19.552 4 19V10Z" fill="#B0B0B0" />
+            </svg>
+          </button>
+        </>
       )}
     </div>
     {showPrompt && (
