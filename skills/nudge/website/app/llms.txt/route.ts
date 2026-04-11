@@ -2,10 +2,13 @@ import * as fs from "node:fs";
 import { NextResponse } from "next/server";
 import * as path from "node:path";
 
-const skill = fs.readFileSync(
-  path.join(process.cwd(), "..", "..", "packages", "expect-skill", "SKILL.md"),
-  "utf-8",
-).replace(/^---[\s\S]*?---\n+/, "");
+let skill = "";
+try {
+  skill = fs.readFileSync(
+    path.join(process.cwd(), "..", "..", "packages", "expect-skill", "SKILL.md"),
+    "utf-8",
+  ).replace(/^---[\s\S]*?---\n+/, "");
+} catch {}
 
 export const GET = () =>
   new NextResponse(skill, {

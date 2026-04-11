@@ -4,9 +4,12 @@ import { createOptionsResponse, getCorsHeaders } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(process.cwd(), "..", "cli", "package.json"), "utf-8"),
-);
+let pkg = { version: "0.0.0" };
+try {
+  pkg = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "..", "cli", "package.json"), "utf-8"),
+  );
+} catch {}
 
 const corsOptions = { methods: "*" as const, headers: "*" as const };
 

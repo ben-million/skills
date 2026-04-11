@@ -605,10 +605,16 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       className="budge-me-paper-preview [font-synthesis:none] relative flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[color(display-p3_0.991_0.991_0.991)] border border-solid border-[color(display-p3_1_1_1)] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
       <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%]${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
-          <div className="flex w-full items-center justify-end pt-2.5 px-3 shrink-0">
+          <div className="flex w-full items-center pt-2.5 px-3 shrink-0">
+              <div className="size-9 shrink-0" />
+              <div className="flex-1 flex justify-center">
+                <div className="[letter-spacing:0px] w-fit text-[color(display-p3_0.543_0.543_0.543)] font-sans font-medium text-xs/4.5">
+                  Arrow keys ← → to navigate
+                </div>
+              </div>
               <div
                 ref={muteRef}
-                className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer"
+                className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer outline-none"
                 onClick={() => {
                   setMuted(m => !m);
                   if (f.buttonFeedback) { setPressedButton("mute"); setTimeout(() => setPressedButton(null), 70); }
@@ -908,7 +914,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               onClick={reset}
               onPointerEnter={() => setResetHovered(true)}
               onPointerLeave={() => setResetHovered(false)}
-              className="cursor-pointer flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
+              className="cursor-pointer flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9 outline-none"
               style={f.buttonFeedback ? {
                 transform: pressedButton === "reset" ? "scale(0.9)" : "scale(1)",
                 transition: pressedButton === "reset"
@@ -954,7 +960,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               onClick={copy}
               onPointerEnter={() => setCopyHovered(true)}
               onPointerLeave={() => setCopyHovered(false)}
-              className="cursor-pointer flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9"
+              className="cursor-pointer flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] size-9 outline-none"
               style={f.buttonFeedback ? {
                 transform: pressedButton === "copy" ? "scale(0.9)" : "scale(1)",
                 transition: pressedButton === "copy"
