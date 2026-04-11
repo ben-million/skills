@@ -32,12 +32,16 @@ function getAudioCtx() {
 
 let oreoBuffer: AudioBuffer | null = null;
 let oreoLoading = false;
-let lastOreoIdx = 0;
 let lastAlertTime = 0;
 
-const OREO_SPRITES: [number, number][] = [
+const OREO_SPRITES_UP: [number, number][] = [
   [22000, 103], [12000, 109], [0, 120],
 ];
+const OREO_SPRITES_DOWN: [number, number][] = [
+  [2000, 110], [4000, 105], [6000, 115],
+];
+let lastOreoIdxUp = 0;
+let lastOreoIdxDown = 0;
 const OREO_BOUNDARY_MAX: [number, number] = [10000, 135];
 const OREO_BOUNDARY_MIN: [number, number] = [24000, 145];
 
@@ -52,12 +56,17 @@ function loadOreoBuffer() {
     .catch(() => { oreoLoading = false; });
 }
 
-function scheduleTick(time: number, volume: number) {
+function scheduleTick(time: number, volume: number, up = true) {
   const ctx = getAudioCtx();
   loadOreoBuffer();
   if (!oreoBuffer) return;
-  lastOreoIdx = (lastOreoIdx + 1) % OREO_SPRITES.length;
-  const sprite = OREO_SPRITES[lastOreoIdx];
+  const sprites = up ? OREO_SPRITES_UP : OREO_SPRITES_DOWN;
+  if (up) {
+    lastOreoIdxUp = (lastOreoIdxUp + 1) % sprites.length;
+  } else {
+    lastOreoIdxDown = (lastOreoIdxDown + 1) % sprites.length;
+  }
+  const sprite = sprites[up ? lastOreoIdxUp : lastOreoIdxDown];
   const offset = sprite[0] / 1000;
   const halfDur = sprite[1] / 1000 / 2;
   const src = ctx.createBufferSource();
@@ -86,13 +95,13 @@ function playConfirm() {
   src.start(ctx.currentTime, offset, halfDur);
 }
 
-function playTick(held = false) {
+function playTick(held = false, up = true) {
   const now = performance.now();
   if (held && now - lastTickTime < 50) return;
   lastTickTime = now;
 
   const ctx = getAudioCtx();
-  scheduleTick(ctx.currentTime, held ? 0.3 : 0.55);
+  scheduleTick(ctx.currentTime, held ? 0.3 : 0.55, up);
 }
 
 let atBoundary = false;
@@ -115,10 +124,10 @@ function playBoundary(isMax: boolean) {
   src.start(ctx.currentTime, offset, halfDur);
 }
 
-function playDoubleTick() {
+function playDoubleTick(up = true) {
   const ctx = getAudioCtx();
-  scheduleTick(ctx.currentTime, 0.25);
-  scheduleTick(ctx.currentTime + 0.055, 0.15);
+  scheduleTick(ctx.currentTime, 0.25, up);
+  scheduleTick(ctx.currentTime + 0.055, 0.15, up);
 }
 
 function Arrow({
@@ -370,7 +379,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     setShaking(false);
     valueRef.current = next;
     setValue(valueRef.current);
-    if (soundOn) playTick(held);
+    if (soundOn) playTick(held, direction > 0);
   }, [f.shiftStep, f.boundaryShake, soundOn]);
 
   const triggerNudge = useCallback(
