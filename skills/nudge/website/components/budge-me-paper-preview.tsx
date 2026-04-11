@@ -243,6 +243,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [slideRangeVisible, setSlideRangeVisible] = useState(false);
   const [slideRangeIdle, setSlideRangeIdle] = useState(true);
   const [hasUsedArrows, setHasUsedArrows] = useState(false);
+  const [barHovered, setBarHovered] = useState(false);
   const slideRangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -574,7 +575,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const isColorSlide = slide === 3;
   const targetColor = `hsl(${value}, 70%, 55%)`;
   const nudgeY = 0;
-  const baseScale = f.barPhysics ? (confirmed ? 1.02 : (isNudging || !slideRangeIdle) ? 1 : 0.8) : 1;
+  const baseScale = f.barPhysics ? (confirmed ? 1.02 : (isNudging || !slideRangeIdle || barHovered) ? 1 : 0.8) : 1;
 
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -727,6 +728,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         <div
           ref={barRef}
           className="shrink-0"
+          onPointerEnter={() => setBarHovered(true)}
+          onPointerLeave={() => setBarHovered(false)}
           style={{
             position: "relative",
             display: "flex",
@@ -740,13 +743,13 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             WebkitFontSmoothing: "antialiased",
             userSelect: "none",
             transform: `translateY(${nudgeY}px) scale(${baseScale})`,
-            opacity: f.idleOpacity ? (isNudging || confirmed || !slideRangeIdle ? 1 : 0.8) : 1,
+            opacity: f.idleOpacity ? (isNudging || confirmed || !slideRangeIdle || barHovered ? 1 : 0.8) : 1,
             transition: f.barPhysics
               ? (confirmed
                   ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), opacity 0.2s ease"
-                  : isNudging
+                  : isNudging || barHovered || !slideRangeIdle
                     ? "transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease"
-                    : "transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease 0.1s")
+                    : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease")
               : "opacity 0.3s ease",
             animation: shaking
               ? "__nudge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"

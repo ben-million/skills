@@ -23,7 +23,7 @@ export default function HomePage() {
             way there. budge is for the last 10.
           </div>
           <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#707070] mt-4">
-            budge appears when your agent makes a change to your UI. Tweak the value (padding, margin, color) then copy the result back to your agent to lock it in.
+            budge appears when your agent makes a change to your UI. Tweak the value (padding, margin, color) then copy the result back to your agent to lock it in. It works just like the nudge feature in your favourite design tool.
           </div>
         </div>
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0 pb-16">
