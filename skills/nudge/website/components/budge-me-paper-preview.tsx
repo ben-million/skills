@@ -112,7 +112,7 @@ function playBoundary(isMax: boolean) {
   const ctx = getAudioCtx();
   loadOreoBuffer();
   if (!oreoBuffer) return;
-  const sprite = isMax ? OREO_BOUNDARY_MAX : OREO_BOUNDARY_MIN;
+  const sprite = OREO_BOUNDARY_MIN;
   const offset = sprite[0] / 1000;
   const halfDur = sprite[1] / 1000 / 2;
   const src = ctx.createBufferSource();
@@ -1002,7 +1002,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       )}
     </div>
     </div>
-      {showPrompt && <div
+      <div
         style={{
           marginTop: 16,
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -1014,6 +1014,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           alignItems: "baseline",
           justifyContent: "center",
           gap: "0.35em",
+          opacity: showPrompt ? 1 : 0,
+          filter: showPrompt ? "blur(0px)" : "blur(4px)",
+          transition: showPrompt
+            ? "opacity 0.25s ease, filter 0.25s ease"
+            : "none",
+          pointerEvents: showPrompt ? "auto" : "none",
         }}
       >
         <span style={{ color: "#999", fontStyle: "italic", marginRight: "0.15em" }}>Prompt</span>
@@ -1052,7 +1058,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             {`${value}${s.unit}`}
           </Calligraph>
         )}
-      </div>}
+      </div>
     </>
   );
 }
