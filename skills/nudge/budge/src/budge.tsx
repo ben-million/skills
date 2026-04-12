@@ -67,9 +67,16 @@ function hslToRGB(h: number, s: number, l: number) {
   };
 }
 
+/**
+ * Detects the CSS color format of `css`, adjusts lightness by `direction * 2%`,
+ * and returns the result in the **same format**. Handles hex, rgb(), hsl(),
+ * color(display-p3 ...), and oklch(). Falls back to browser resolution for
+ * named colors or unknown formats, outputting hex.
+ */
 function stepColor(css: string, direction: number): string | null {
   const STEP = direction * 2;
 
+  // --- hex (#rgb, #rrggbb, #rrggbbaa) ---
   if (/^#[0-9a-f]{3,8}$/i.test(css)) {
     let hex = css;
     if (hex.length === 4)
@@ -88,6 +95,7 @@ function stepColor(css: string, direction: number): string | null {
     );
   }
 
+  // --- color(display-p3 r g b) — values 0-1 ---
   const p3 = css.match(
     /color\(\s*display-p3\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/
   );
@@ -98,6 +106,7 @@ function stepColor(css: string, direction: number): string | null {
     return `color(display-p3 ${out.r.toFixed(4)} ${out.g.toFixed(4)} ${out.b.toFixed(4)})`;
   }
 
+  // --- oklch(L C H) — L is 0-1 or 0%-100% ---
   const ok = css.match(
     /oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)\s*\)/
   );
@@ -112,6 +121,7 @@ function stepColor(css: string, direction: number): string | null {
     return `oklch(${l.toFixed(4)} ${ok[2]} ${ok[3]})`;
   }
 
+  // --- rgb(r, g, b) / rgba(r, g, b, a) ---
   const rgb = css.match(
     /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/
   );
@@ -127,6 +137,7 @@ function stepColor(css: string, direction: number): string | null {
     );
   }
 
+  // --- hsl(h, s%, l%) ---
   const hsl = css.match(
     /hsla?\(\s*([\d.]+)[,\s]+([\d.]+)%?[,\s]+([\d.]+)%?/
   );
@@ -135,6 +146,7 @@ function stepColor(css: string, direction: number): string | null {
     return `hsl(${hsl[1]}, ${hsl[2]}%, ${l}%)`;
   }
 
+  // --- Fallback: resolve through browser, output hex ---
   const el = document.createElement("div");
   el.style.color = css;
   document.body.appendChild(el);
@@ -276,6 +288,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
     setMounted(true);
   }, []);
 
+  // Reset state when config changes
   useEffect(() => {
     if (!config) {
       setTargetEl(null);
@@ -328,6 +341,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
     return () => clearTimeout(exitTimeoutRef.current);
   }, [shouldShow]);
 
+  // Find target element
   useEffect(() => {
     if (!config || dismissed) {
       setTargetEl(null);
@@ -387,6 +401,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
     setTargetEl(null);
   }, [config, targetEl]);
 
+  // Keyboard handler
   useEffect(() => {
     if (!config || !targetEl || dismissed) return;
 
@@ -561,6 +576,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
 // Guidelines — property-aware visualization
 // ---------------------------------------------------------------------------
 
+const GUIDE_COLOR = "#3B82F6";
 const GUIDE_FILL = "rgba(59, 130, 246, 0.13)";
 
 function activeSides(property: string) {
@@ -585,6 +601,183 @@ function activeSides(property: string) {
   if (p.includes("-inline"))
     return { top: false, right: true, bottom: false, left: true };
   return { top: true, right: true, bottom: true, left: true };
+}
+
+function Guidelines({
+  target,
+  expanded,
+  property,
+}: {
+  target: Element;
+  expanded: boolean;
+  property: string;
+}) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [cs, setCs] = useState<CSSStyleDeclaration | null>(null);
+
+  useEffect(() => {
+    if (!target) return;
+    const update = () => {
+      setRect(target.getBoundingClientRect());
+      setCs(getComputedStyle(target));
+    };
+    update();
+    if (!expanded) return;
+    const id = setInterval(update, 60);
+    return () => clearInterval(id);
+  }, [target, expanded]);
+
+  if (!rect || !cs) return null;
+
+  const base: React.CSSProperties = {
+    position: "fixed",
+    pointerEvents: "none",
+    zIndex: 2147483646,
+    opacity: expanded ? 1 : 0,
+    transition: expanded ? "opacity 0.25s ease 0.05s" : "opacity 0.2s ease",
+  };
+
+  const outline = null;
+
+  const fill = (
+    l: number,
+    t: number,
+    w: number,
+    h: number,
+    key: string
+  ) =>
+    w > 0 && h > 0 ? (
+      <div key={key} style={{ ...base, left: l, top: t, width: w, height: h, background: GUIDE_FILL }} />
+    ) : null;
+
+  const isPadding = property.startsWith("padding");
+  const isMargin = property.startsWith("margin");
+  const isWidth =
+    property === "width" ||
+    property === "max-width" ||
+    property === "min-width";
+  const isHeight =
+    property === "height" ||
+    property === "max-height" ||
+    property === "min-height";
+  const isGap =
+    property === "gap" ||
+    property === "row-gap" ||
+    property === "column-gap";
+
+  if (isPadding) {
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pr = parseFloat(cs.paddingRight) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    const pl = parseFloat(cs.paddingLeft) || 0;
+    const s = activeSides(property);
+    return (
+      <>
+        {outline}
+        {s.top && fill(rect.left, rect.top, rect.width, pt, "pt")}
+        {s.bottom && fill(rect.left, rect.bottom - pb, rect.width, pb, "pb")}
+        {s.left &&
+          fill(
+            rect.left,
+            rect.top + (s.top ? pt : 0),
+            pl,
+            rect.height - (s.top ? pt : 0) - (s.bottom ? pb : 0),
+            "pl"
+          )}
+        {s.right &&
+          fill(
+            rect.right - pr,
+            rect.top + (s.top ? pt : 0),
+            pr,
+            rect.height - (s.top ? pt : 0) - (s.bottom ? pb : 0),
+            "pr"
+          )}
+      </>
+    );
+  }
+
+  if (isMargin) {
+    const mt = parseFloat(cs.marginTop) || 0;
+    const mr = parseFloat(cs.marginRight) || 0;
+    const mb = parseFloat(cs.marginBottom) || 0;
+    const ml = parseFloat(cs.marginLeft) || 0;
+    const s = activeSides(property);
+    return (
+      <>
+        {outline}
+        {s.top && fill(rect.left, rect.top - mt, rect.width, mt, "mt")}
+        {s.bottom && fill(rect.left, rect.bottom, rect.width, mb, "mb")}
+        {s.left && fill(rect.left - ml, rect.top, ml, rect.height, "ml")}
+        {s.right && fill(rect.right, rect.top, mr, rect.height, "mr")}
+      </>
+    );
+  }
+
+  if (isWidth) {
+    const cy = rect.top + rect.height / 2;
+    return (
+      <>
+        {outline}
+        <div
+          style={{ ...base, left: rect.left, top: cy, width: rect.width, height: 1, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: rect.left, top: cy - 4, width: 1, height: 9, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: rect.right - 1, top: cy - 4, width: 1, height: 9, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+      </>
+    );
+  }
+
+  if (isHeight) {
+    const cx = rect.left + rect.width / 2;
+    return (
+      <>
+        {outline}
+        <div
+          style={{ ...base, left: cx, top: rect.top, width: 1, height: rect.height, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: cx - 4, top: rect.top, width: 9, height: 1, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+        <div
+          style={{ ...base, left: cx - 4, top: rect.bottom - 1, width: 9, height: 1, background: GUIDE_COLOR, opacity: expanded ? 0.7 : 0 }}
+        />
+      </>
+    );
+  }
+
+  if (isGap) {
+    const children = Array.from(target.children);
+    if (children.length < 2) return outline;
+    const rects = children.map((c) => c.getBoundingClientRect());
+    const dir = cs.flexDirection || "row";
+    const isRow = dir === "row" || dir === "row-reverse";
+    const gaps: React.ReactNode[] = [];
+    for (let i = 0; i < rects.length - 1; i++) {
+      const a = rects[i];
+      const b = rects[i + 1];
+      if (isRow) {
+        const gl = Math.min(a.right, b.right);
+        const gr = Math.max(a.left, b.left);
+        if (gr > gl) gaps.push(fill(gl, rect.top, gr - gl, rect.height, `g${i}`));
+      } else {
+        const gt = Math.min(a.bottom, b.bottom);
+        const gb = Math.max(a.top, b.top);
+        if (gb > gt) gaps.push(fill(rect.left, gt, rect.width, gb - gt, `g${i}`));
+      }
+    }
+    return (
+      <>
+        {outline}
+        {gaps}
+      </>
+    );
+  }
+
+  return outline;
 }
 
 // ---------------------------------------------------------------------------
