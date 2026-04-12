@@ -18,6 +18,120 @@ const BUDGE_KEYFRAMES = `@keyframes __budge-shake{0%,100%{translate:0}25%{transl
 let budgeStyleInjected = false;
 
 // ---------------------------------------------------------------------------
+// Audio — subtle haptic tick via Web Audio API
+// ---------------------------------------------------------------------------
+
+let audioCtx: AudioContext | null = null;
+let lastTickTime = 0;
+let audioBasePath = "https://budge.dev";
+
+export function setAudioBasePath(path: string) {
+  audioBasePath = path.replace(/\/$/, "");
+}
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+let oreoBuffer: AudioBuffer | null = null;
+let oreoLoading = false;
+
+const OREO_SPRITES_UP: [number, number][] = [
+  [22000, 103], [12000, 109], [0, 120],
+];
+const OREO_SPRITES_DOWN: [number, number][] = [
+  [2000, 110], [4000, 105], [6000, 115],
+];
+let lastOreoIdxUp = 0;
+let lastOreoIdxDown = 0;
+const OREO_BOUNDARY_MIN: [number, number] = [24000, 145];
+const OREO_CONFIRM: [number, number] = [8000, 112];
+
+function loadOreoBuffer() {
+  if (oreoBuffer || oreoLoading) return;
+  oreoLoading = true;
+  const ctx = getAudioCtx();
+  fetch(audioBasePath + "/oreo.mp3")
+    .then(r => r.arrayBuffer())
+    .then(ab => ctx.decodeAudioData(ab))
+    .then(buf => { oreoBuffer = buf; })
+    .catch(() => { oreoLoading = false; });
+}
+
+function scheduleTick(time: number, volume: number, up = true) {
+  const ctx = getAudioCtx();
+  loadOreoBuffer();
+  if (!oreoBuffer) return;
+  const sprites = up ? OREO_SPRITES_UP : OREO_SPRITES_DOWN;
+  if (up) {
+    lastOreoIdxUp = (lastOreoIdxUp + 1) % sprites.length;
+  } else {
+    lastOreoIdxDown = (lastOreoIdxDown + 1) % sprites.length;
+  }
+  const sprite = sprites[up ? lastOreoIdxUp : lastOreoIdxDown];
+  const offset = sprite[0] / 1000;
+  const halfDur = sprite[1] / 1000 / 2;
+  const src = ctx.createBufferSource();
+  src.buffer = oreoBuffer;
+  const gain = ctx.createGain();
+  gain.gain.value = volume * (0.85 + Math.random() * 0.3);
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(time, offset, halfDur);
+}
+
+function playConfirm() {
+  const ctx = getAudioCtx();
+  loadOreoBuffer();
+  if (!oreoBuffer) return;
+  const offset = OREO_CONFIRM[0] / 1000;
+  const halfDur = OREO_CONFIRM[1] / 1000 / 2;
+  const src = ctx.createBufferSource();
+  src.buffer = oreoBuffer;
+  const gain = ctx.createGain();
+  gain.gain.value = 0.6;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(ctx.currentTime, offset, halfDur);
+}
+
+function playTick(held = false, up = true) {
+  const now = performance.now();
+  if (held && now - lastTickTime < 50) return;
+  lastTickTime = now;
+  const ctx = getAudioCtx();
+  scheduleTick(ctx.currentTime, held ? 0.3 : 0.55, up);
+}
+
+let atBoundary = false;
+
+function playBoundary() {
+  if (atBoundary) return;
+  atBoundary = true;
+  const ctx = getAudioCtx();
+  loadOreoBuffer();
+  if (!oreoBuffer) return;
+  const sprite = OREO_BOUNDARY_MIN;
+  const offset = sprite[0] / 1000;
+  const halfDur = sprite[1] / 1000 / 2;
+  const src = ctx.createBufferSource();
+  src.buffer = oreoBuffer;
+  const gain = ctx.createGain();
+  gain.gain.value = 0.55;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(ctx.currentTime, offset, halfDur);
+}
+
+function playDoubleTick(up = true) {
+  const ctx = getAudioCtx();
+  scheduleTick(ctx.currentTime, 0.25, up);
+  scheduleTick(ctx.currentTime + 0.055, 0.15, up);
+}
+
+// ---------------------------------------------------------------------------
 // Color helpers — format-preserving lightness stepping
 // ---------------------------------------------------------------------------
 
@@ -262,6 +376,14 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
   if (config) lastIsColorRef.current = config.type === "color";
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
   const [isNudging, setIsNudging] = useState(false);
+  const [barHovered, setBarHovered] = useState(false);
+  const [boundaryLabel, setBoundaryLabel] = useState<"Min" | "Max" | null>(null);
+  const [boundaryLabelVisible, setBoundaryLabelVisible] = useState(false);
+  const boundaryHitsRef = useRef(0);
+  const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const holdIntervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const savedValueRef = useRef("");
   const numericRef = useRef(0);
@@ -269,7 +391,32 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
   const optionIndexRef = useRef(0);
   const currentValueRef = useRef("");
   const budgeTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const stepValueRef = useRef<((direction: number, shift: boolean) => void) | undefined>(undefined);
+  const stepValueRef = useRef<((direction: number, shift: boolean, held?: boolean) => void) | undefined>(undefined);
+
+  useEffect(() => { loadOreoBuffer(); }, []);
+
+  const startHold = useCallback((dir: "up" | "down") => {
+    const d = dir === "up" ? 1 : -1;
+    stepValueRef.current?.(d, false);
+    setActiveKey(dir);
+    setIsNudging(true);
+    clearTimeout(budgeTimeoutRef.current);
+    clearTimeout(holdTimeoutRef.current);
+    clearInterval(holdIntervalRef.current);
+    holdTimeoutRef.current = setTimeout(() => {
+      holdIntervalRef.current = setInterval(() => {
+        stepValueRef.current?.(d, false, true);
+      }, 50);
+    }, 300);
+  }, []);
+
+  const stopHold = useCallback(() => {
+    clearTimeout(holdTimeoutRef.current);
+    clearInterval(holdIntervalRef.current);
+    setActiveKey(null);
+    clearTimeout(budgeTimeoutRef.current);
+    budgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+  }, []);
 
   const triggerBudge = useCallback(
     (dir: "up" | "down") => {
@@ -412,7 +559,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
     const min = config.min ?? -9999;
     const max = config.max ?? 9999;
 
-    function stepValue(direction: number, shift: boolean) {
+    function stepValue(direction: number, shift: boolean, held = false) {
       let next: string;
 
       if (isOptions) {
@@ -422,10 +569,12 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
           config!.options!.length - 1
         );
         next = String(config!.options![optionIndexRef.current]);
+        playTick(held, direction > 0);
       } else if (isColor) {
         const stepped = stepColor(currentValueRef.current, direction);
         if (!stepped) return;
         next = stepped;
+        playTick(held, direction > 0);
       } else {
         const s = step >= 1 ? 1 : step;
         const mult = shift ? 10 : 1;
@@ -437,10 +586,42 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
           setShaking(true);
           clearTimeout(shakeTimeoutRef.current);
           shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
+          boundaryHitsRef.current++;
+          if (boundaryHitsRef.current >= 20) {
+            const label = direction > 0 ? "Max" : "Min";
+            setBoundaryLabel(label);
+            clearTimeout(boundaryLabelTimeoutRef.current);
+            clearTimeout(boundaryLabelExitRef.current);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => setBoundaryLabelVisible(true));
+            });
+            boundaryLabelTimeoutRef.current = setTimeout(() => {
+              setBoundaryLabelVisible(false);
+              boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
+            }, 400);
+          }
+          playBoundary();
+          next = unitRef.current
+            ? numericRef.current + unitRef.current
+            : String(numericRef.current);
+          applyPreview(targetEl!, next);
+          currentValueRef.current = next;
+          setCurrentValue(next);
+          return;
         }
+        atBoundary = false;
+        boundaryHitsRef.current = 0;
+        if (boundaryLabel) {
+          setBoundaryLabelVisible(false);
+          clearTimeout(boundaryLabelTimeoutRef.current);
+          clearTimeout(boundaryLabelExitRef.current);
+          boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
+        }
+        setShaking(false);
         next = unitRef.current
           ? numericRef.current + unitRef.current
           : String(numericRef.current);
+        playTick(held, direction > 0);
       }
 
       applyPreview(targetEl!, next);
@@ -468,6 +649,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
       copyToClipboard(buildPrompt());
       setConfirmed(true);
       setIsNudging(true);
+      playConfirm();
       clearTimeout(budgeTimeoutRef.current);
       budgeTimeoutRef.current = setTimeout(() => {
         setConfirmed(false);
@@ -502,6 +684,7 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
       if (e.key === "r" || e.key === "R") {
         e.preventDefault();
         const orig = config!.original;
+        const prev = numericRef.current;
         applyPreview(targetEl!, orig);
         currentValueRef.current = orig;
         setCurrentValue(orig);
@@ -509,6 +692,11 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
         if (match) {
           numericRef.current = parseFloat(orig) || 0;
           unitRef.current = match[2];
+        }
+        if (Math.floor(prev / 10) !== Math.floor(numericRef.current / 10)) {
+          playDoubleTick();
+        } else {
+          playTick();
         }
         setIsNudging(true);
         clearTimeout(budgeTimeoutRef.current);
@@ -561,10 +749,19 @@ export function Budge({ config }: { config?: BudgeConfig | null }) {
           activeKey={activeKey}
           isColor={lastIsColorRef.current}
           expanded={isNudging}
-          onBudge={triggerBudge}
+          startHold={startHold}
+          stopHold={stopHold}
           confirmed={confirmed}
           visible={barVisible}
           shaking={shaking}
+          barHovered={barHovered}
+          onBarHover={setBarHovered}
+          propertyLabel={config?.property}
+          atMin={numericRef.current <= (config?.min ?? -9999)}
+          atMax={numericRef.current >= (config?.max ?? 9999)}
+          boundaryLabel={boundaryLabel}
+          boundaryLabelVisible={boundaryLabelVisible}
+          unit={unitRef.current}
         />
       )}
       {toastMsg && <Toast message={toastMsg} />}
@@ -792,12 +989,21 @@ const ARROW_D =
 function Arrow({
   active,
   down,
-  onClick,
+  disabled,
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
+  activeColor,
 }: {
   active: boolean;
   down?: boolean;
-  onClick?: () => void;
+  disabled?: boolean;
+  onPointerDown?: () => void;
+  onPointerUp?: () => void;
+  onPointerLeave?: () => void;
+  activeColor?: string;
 }) {
+  const fill = disabled ? "#A7A7A7" : active ? (activeColor ?? "#FFFFFF") : "#A7A7A7";
   return (
     <svg
       width="1em"
@@ -805,13 +1011,15 @@ function Arrow({
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      onClick={onClick}
+      onPointerDown={disabled ? undefined : onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
       style={{
         width: 19,
         height: "auto",
         flexShrink: 0,
-        cursor: "pointer",
-        transform: `rotate(${down ? 180 : 0}deg) translateY(${active ? -2.5 : 0}px) scale(${active ? 1.08 : 1})`,
+        cursor: disabled ? "default" : "pointer",
+        transform: `rotate(${down ? 180 : 0}deg) translateY(${active && !disabled ? -2.5 : 0}px) scale(${active && !disabled ? 1.08 : 1})`,
         transition: active
           ? "transform 0.03s cubic-bezier(0, 0, 0.2, 1)"
           : "transform 0.45s cubic-bezier(0.34, 1.8, 0.64, 1)",
@@ -821,9 +1029,11 @@ function Arrow({
         fillRule="evenodd"
         clipRule="evenodd"
         d={ARROW_D}
-        fill={active ? "#FFFFFF" : "#A7A7A7"}
+        fill={fill}
         style={{
-          transition: active ? "fill 0.05s ease" : "fill 0.3s ease",
+          transition: disabled
+            ? "fill 0.2s ease"
+            : active ? "fill 0.05s ease" : "fill 0.3s ease",
         }}
       />
     </svg>
@@ -835,19 +1045,37 @@ function Bar({
   activeKey,
   isColor,
   expanded,
-  onBudge,
+  startHold,
+  stopHold,
   confirmed,
   visible,
   shaking,
+  barHovered,
+  onBarHover,
+  propertyLabel,
+  atMin,
+  atMax,
+  boundaryLabel,
+  boundaryLabelVisible,
+  unit,
 }: {
   value: string;
   activeKey: "up" | "down" | null;
   isColor: boolean;
   expanded: boolean;
-  onBudge: (direction: "up" | "down") => void;
+  startHold: (dir: "up" | "down") => void;
+  stopHold: () => void;
   confirmed: boolean;
   visible: boolean;
   shaking: boolean;
+  barHovered: boolean;
+  onBarHover: (v: boolean) => void;
+  propertyLabel?: string;
+  atMin: boolean;
+  atMax: boolean;
+  boundaryLabel: "Min" | "Max" | null;
+  boundaryLabelVisible: boolean;
+  unit: string;
 }) {
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -859,17 +1087,22 @@ function Bar({
     "margin-right 0.45s cubic-bezier(0.32, 0.72, 0, 1), " +
     "opacity 0.15s ease";
 
-  const baseScale = !visible ? 0.5 : confirmed ? 1.02 : expanded ? 1 : 0.8;
+  const baseScale = !visible ? 0.5 : confirmed ? 1.02 : (expanded || barHovered) ? 1 : 0.8;
   const budgeY = activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0;
+
+  const displayNum = value.replace(/[a-z%°]+$/i, "");
+  const displayUnit = unit || "";
 
   return (
     <div
+      onPointerEnter={() => onBarHover(true)}
+      onPointerLeave={() => onBarHover(false)}
       style={{
         position: "fixed",
         bottom: expanded ? 20 : 12,
         left: "50%",
         transform: `translateX(-50%) translateY(${budgeY}px) scale(${baseScale})`,
-        opacity: visible ? (expanded || confirmed ? 1 : 0.8) : 0,
+        opacity: visible ? (expanded || confirmed || barHovered ? 1 : 0.8) : 0,
         zIndex: 2147483647,
         display: "flex",
         height: 37,
@@ -883,14 +1116,63 @@ function Bar({
         userSelect: "none",
         transition: confirmed
           ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease"
-          : expanded
+          : expanded || barHovered
             ? "transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.15s ease"
-            : "transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease 0.1s",
+            : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease",
         animation: shaking
           ? "__budge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
           : "none",
       }}
     >
+      {propertyLabel && expanded && (
+        <div style={{
+          position: "absolute",
+          bottom: "100%",
+          left: "50%",
+          pointerEvents: "none",
+          transform: `scale(${1 / baseScale}) translateX(-50%) translateY(${expanded ? 0 : 8}px)`,
+          transformOrigin: "top left",
+          paddingBottom: 10,
+          opacity: expanded ? 1 : 0,
+          filter: expanded ? "blur(0px)" : "blur(4px)",
+          transition: expanded
+            ? "opacity 0.2s ease, filter 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+            : "opacity 0.25s ease, filter 0.25s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+        }}>
+          <span style={{
+            fontFamily: FONT,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "#666",
+            letterSpacing: "0.01em",
+            whiteSpace: "nowrap",
+          }}>
+            {propertyLabel}
+          </span>
+        </div>
+      )}
+      {boundaryLabel && (
+        <div style={{
+          position: "absolute",
+          bottom: "100%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          pointerEvents: "none",
+          paddingBottom: 10,
+          opacity: boundaryLabelVisible ? 1 : 0,
+          transition: boundaryLabelVisible ? "opacity 0.15s ease" : "opacity 0.2s ease",
+        }}>
+          <span style={{
+            fontFamily: FONT,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "#999",
+            whiteSpace: "nowrap",
+          }}>
+            {boundaryLabel}
+          </span>
+        </div>
+      )}
       <div style={{
         position: "absolute",
         inset: 0,
@@ -922,38 +1204,65 @@ function Bar({
         <>
           <div
             style={{
-              maxWidth: expanded ? 100 : 0,
-              marginRight: expanded ? 1 : 0,
-              opacity: expanded ? 1 : 0,
-              transition: expanded ? expandTransition : collapseTransition,
+              maxWidth: expanded && !isColor ? 100 : 0,
+              marginRight: expanded && !isColor ? 1 : 0,
+              opacity: expanded && !isColor ? 1 : 0,
+              transition: expanded
+                ? expandTransition
+                : collapseTransition,
               display: "flex",
               alignItems: "center",
+              overflow: "visible",
             }}
           >
-            {isColor ? null : (
+            <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 44, textAlign: "left" }}>
               <Calligraph
                 variant="slots"
                 animation="snappy"
+                stagger={0}
                 style={{
-                  color: "#fff",
+                  color: shaking ? "#A7A7A7" : "#fff",
                   fontFamily: FONT,
                   fontWeight: 500,
                   fontSize: 14.5,
                   lineHeight: "22px",
                   whiteSpace: "nowrap",
                   fontVariantNumeric: "tabular-nums",
-                  minWidth: 48,
-                  textAlign: "left",
+                  transition: "color 0.2s ease",
                 }}
               >
-                {value}
+                {displayNum}
               </Calligraph>
-            )}
+              {displayUnit && (
+                <span style={{
+                  color: shaking ? "#A7A7A7" : "#fff",
+                  fontFamily: FONT,
+                  fontWeight: 500,
+                  fontSize: 11,
+                  lineHeight: "22px",
+                  transition: "color 0.2s ease",
+                  marginLeft: 1,
+                }}>{displayUnit}</span>
+              )}
+            </span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <Arrow down active={activeKey === "down"} onClick={() => onBudge("down")} />
-            <Arrow active={activeKey === "up"} onClick={() => onBudge("up")} />
+            <Arrow
+              down
+              active={activeKey === "down"}
+              disabled={shaking && atMin}
+              onPointerDown={() => startHold("down")}
+              onPointerUp={stopHold}
+              onPointerLeave={stopHold}
+            />
+            <Arrow
+              active={activeKey === "up"}
+              disabled={shaking && atMax}
+              onPointerDown={() => startHold("up")}
+              onPointerUp={stopHold}
+              onPointerLeave={stopHold}
+            />
           </div>
         </>
       )}
