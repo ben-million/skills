@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Calligraph } from "calligraph";
 
 const FONT = "'Open Runde', system-ui, sans-serif";
-const SHAKE_KEYFRAMES = `@keyframes __nudge-shake{0%,100%{translate:0}25%{translate:-2px}50%{translate:2px}75%{translate:-1px}}@keyframes nudge-copied-in{0%{opacity:0;transform:scale(0.85)}100%{opacity:1;transform:scale(1)}}`;
+const SHAKE_KEYFRAMES = `@keyframes __budge-shake{0%,100%{translate:0}25%{translate:-2px}50%{translate:2px}75%{translate:-1px}}@keyframes budge-copied-in{0%{opacity:0;transform:scale(0.85)}100%{opacity:1;transform:scale(1)}}`;
 let shakeInjected = false;
 const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
@@ -222,7 +222,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const [value, setValue] = useState(ORIGINAL);
   const [typedRaw, setTypedRaw] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<"up" | "down" | null>(null);
-  const [isNudging, setIsNudging] = useState(false);
+  const [isBudging, setIsBudging] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [pressedButton, setPressedButton] = useState<"reset" | "copy" | "prev" | "next" | "mute" | null>(null);
@@ -248,7 +248,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const boundaryLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boundaryLabelExitRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const budgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const confirmedTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const digitBufferRef = useRef("");
   const digitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -301,14 +301,14 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     valueRef.current = restored;
     setValue(restored);
     setTypedRaw(null);
-    setIsNudging(false);
+    setIsBudging(false);
     setShaking(false);
     setConfirmed(false);
     setShowPrompt(false);
     setActiveKey(null);
     digitBufferRef.current = "";
     clearTimeout(digitTimeoutRef.current);
-    clearTimeout(nudgeTimeoutRef.current);
+    clearTimeout(budgeTimeoutRef.current);
     clearTimeout(shakeTimeoutRef.current);
     clearTimeout(confirmedTimeoutRef.current);
 
@@ -334,9 +334,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     if (clamped !== valueRef.current) {
       valueRef.current = clamped;
       setValue(clamped);
-      setIsNudging(true);
-      clearTimeout(nudgeTimeoutRef.current);
-      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+      setIsBudging(true);
+      clearTimeout(budgeTimeoutRef.current);
+      budgeTimeoutRef.current = setTimeout(() => setIsBudging(false), 600);
       playTick();
     }
   };
@@ -384,7 +384,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     if (soundOn) playTick(held, direction > 0);
   }, [f.shiftStep, f.boundaryShake, soundOn]);
 
-  const triggerNudge = useCallback(
+  const triggerBudge = useCallback(
     (dir: "up" | "down") => {
       step(dir === "up" ? 1 : -1);
       setActiveKey(dir);
@@ -397,9 +397,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     const d = dir === "up" ? 1 : -1;
     step(d);
     setActiveKey(dir);
-    clearTimeout(nudgeTimeoutRef.current);
-    if (isNudging) {
-      setIsNudging(true);
+    clearTimeout(budgeTimeoutRef.current);
+    if (isBudging) {
+      setIsBudging(true);
     }
     clearTimeout(holdTimeoutRef.current);
     clearInterval(holdIntervalRef.current);
@@ -408,27 +408,27 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         step(d, false, true);
       }, 50);
     }, 300);
-  }, [step, isNudging]);
+  }, [step, isBudging]);
 
   const stopHold = useCallback(() => {
     clearTimeout(holdTimeoutRef.current);
     clearInterval(holdIntervalRef.current);
     setActiveKey(null);
-    if (isNudging) {
-      clearTimeout(nudgeTimeoutRef.current);
-      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+    if (isBudging) {
+      clearTimeout(budgeTimeoutRef.current);
+      budgeTimeoutRef.current = setTimeout(() => setIsBudging(false), 600);
     }
-  }, [isNudging]);
+  }, [isBudging]);
 
   const reset = useCallback(() => {
     const cs = SLIDES[slideRef.current];
     const prev = valueRef.current;
     valueRef.current = cs.original;
     setValue(cs.original);
-    setIsNudging(true);
+    setIsBudging(true);
     if (f.buttonFeedback) setPressedButton("reset");
-    clearTimeout(nudgeTimeoutRef.current);
-    nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+    clearTimeout(budgeTimeoutRef.current);
+    budgeTimeoutRef.current = setTimeout(() => setIsBudging(false), 600);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
     if (soundOn) {
       if (Math.floor(prev / 10) !== Math.floor(cs.original / 10)) {
@@ -449,12 +449,12 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     navigator.clipboard?.writeText(prompt);
     setShowPrompt(true);
     setConfirmed(true);
-    setIsNudging(true);
+    setIsBudging(true);
     if (f.buttonFeedback) setPressedButton("copy");
     clearTimeout(confirmedTimeoutRef.current);
     confirmedTimeoutRef.current = setTimeout(() => {
       setConfirmed(false);
-      setIsNudging(false);
+      setIsBudging(false);
     }, 800);
     if (f.buttonFeedback) setTimeout(() => setPressedButton(null), 70);
     if (soundOn) playConfirm();
@@ -479,18 +479,18 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         stepRef.current(1, e.shiftKey, e.repeat);
         setActiveKey("up");
         if (f.expandValue) {
-          setIsNudging(true);
-          clearTimeout(nudgeTimeoutRef.current);
-          nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+          setIsBudging(true);
+          clearTimeout(budgeTimeoutRef.current);
+          budgeTimeoutRef.current = setTimeout(() => setIsBudging(false), 600);
         }
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         stepRef.current(-1, e.shiftKey, e.repeat);
         setActiveKey("down");
         if (f.expandValue) {
-          setIsNudging(true);
-          clearTimeout(nudgeTimeoutRef.current);
-          nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+          setIsBudging(true);
+          clearTimeout(budgeTimeoutRef.current);
+          budgeTimeoutRef.current = setTimeout(() => setIsBudging(false), 600);
         }
       } else if (f.numberInput && e.key >= "0" && e.key <= "9") {
         e.preventDefault();
@@ -500,7 +500,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         const ds = SLIDES[slideRef.current];
         if (!isNaN(num)) {
           setTypedRaw(digitBufferRef.current);
-          setIsNudging(true);
+          setIsBudging(true);
           playTick();
           if (num >= ds.min && num <= ds.max) {
             valueRef.current = num;
@@ -508,7 +508,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
           }
         }
         clearTimeout(digitTimeoutRef.current);
-        clearTimeout(nudgeTimeoutRef.current);
+        clearTimeout(budgeTimeoutRef.current);
         digitTimeoutRef.current = setTimeout(() => {
           const final = parseInt(digitBufferRef.current, 10);
           digitBufferRef.current = "";
@@ -523,10 +523,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               clearTimeout(shakeTimeoutRef.current);
               shakeTimeoutRef.current = setTimeout(() => setShaking(false), 300);
             }
-            nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+            budgeTimeoutRef.current = setTimeout(() => setIsBudging(false), 600);
           } else {
             setTypedRaw(null);
-            setIsNudging(false);
+            setIsBudging(false);
           }
         }, 500);
       } else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) {
@@ -559,7 +559,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
     return () => {
       el.removeEventListener("keydown", onKeyDown);
       el.removeEventListener("keyup", onKeyUp);
-      clearTimeout(nudgeTimeoutRef.current);
+      clearTimeout(budgeTimeoutRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -574,8 +574,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const atMax = value >= s.max;
   const isColorSlide = slide === 3;
   const targetColor = `hsl(${value}, 70%, 55%)`;
-  const nudgeY = 0;
-  const baseScale = f.barPhysics ? (confirmed ? 1.02 : (isNudging || !slideRangeIdle || barHovered) ? 1 : 0.8) : 1;
+  const budgeY = 0;
+  const baseScale = f.barPhysics ? (confirmed ? 1.02 : (isBudging || !slideRangeIdle || barHovered) ? 1 : 0.8) : 1;
 
   const expandTransition =
     "max-width 0.5s cubic-bezier(0.32, 0.72, 0, 1), " +
@@ -616,7 +616,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
       ref={containerRef}
       tabIndex={0}
       onPointerDown={() => containerRef.current?.focus()}
-      className="budge-me-paper-preview [font-synthesis:none] relative flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[color(display-p3_0.991_0.991_0.991)] border border-solid border-[color(display-p3_1_1_1)] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
+      className="budge-paper-preview [font-synthesis:none] relative flex w-114.25 h-77.75 flex-col rounded-[14px] overflow-clip bg-[color(display-p3_0.991_0.991_0.991)] border border-solid border-[color(display-p3_1_1_1)] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] antialiased text-xs/4 outline-none">
       <div className={`flex min-h-0 flex-col items-center grow shrink basis-[0%]${f.showText === false && f.showLabel === false ? " justify-center" : ""}`}>
         {f.showLabel !== false && (
           <div className="flex w-full items-center pt-2.5 px-3 shrink-0">
@@ -742,17 +742,17 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             fontSynthesis: "none",
             WebkitFontSmoothing: "antialiased",
             userSelect: "none",
-            transform: `translateY(${nudgeY}px) scale(${baseScale})`,
-            opacity: f.idleOpacity ? (isNudging || confirmed || !slideRangeIdle || barHovered ? 1 : 0.8) : 1,
+            transform: `translateY(${budgeY}px) scale(${baseScale})`,
+            opacity: f.idleOpacity ? (isBudging || confirmed || !slideRangeIdle || barHovered ? 1 : 0.8) : 1,
             transition: f.barPhysics
               ? (confirmed
                   ? "transform 0.3s cubic-bezier(0.2, 0, 0, 1.2), opacity 0.2s ease"
-                  : isNudging || barHovered || !slideRangeIdle
+                  : isBudging || barHovered || !slideRangeIdle
                     ? "transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease"
                     : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease")
               : "opacity 0.3s ease",
             animation: shaking
-              ? "__nudge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
+              ? "__budge-shake 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite"
               : "none",
           }}
         >
@@ -804,7 +804,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                 fontSize: 14.5,
                 lineHeight: "22px",
                 whiteSpace: "nowrap",
-                animation: "nudge-copied-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+                animation: "budge-copied-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
               }}
             >
               Copied
@@ -813,10 +813,10 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             <>
               <div
                 style={{
-                  maxWidth: isNudging && !isColorSlide ? 100 : 0,
-                  marginRight: isNudging && !isColorSlide ? 1 : 0,
-                  opacity: isNudging && !isColorSlide ? 1 : 0,
-                  transition: isNudging
+                  maxWidth: isBudging && !isColorSlide ? 100 : 0,
+                  marginRight: isBudging && !isColorSlide ? 1 : 0,
+                  opacity: isBudging && !isColorSlide ? 1 : 0,
+                  transition: isBudging
                     ? expandTransition
                     : collapseTransition,
                   display: "flex",

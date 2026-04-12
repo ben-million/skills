@@ -1,30 +1,30 @@
 ---
-name: nudge
+name: budge
 description: Use when making single-property CSS or Tailwind visual changes in Next.js App Router projects. Presents a floating control widget on the page so the user can tweak the value before it is persisted. Covers atomic style changes, live preview, and cleanup. Triggers on single CSS value or single Tailwind utility class modifications.
 ---
 
-# Nudge
+# Budge
 
-**Proactive skill. Next.js App Router only.** If a task results in a single CSS property or Tailwind class change, follow this skill automatically. The user should never need to say "use nudge."
+**Proactive skill. Next.js App Router only.** If a task results in a single CSS property or Tailwind class change, follow this skill automatically. The user should never need to say "use budge."
 
 You present a minimal toast bar on the page after making an atomic visual change. The user fine-tunes the value with arrow keys. **You complete your turn immediately after setting the config — no browser interaction, no waiting.**
 
-The runtime is a React client component (`app/__nudge.tsx`). It handles everything client-side: live preview, DOM cleanup, submit (Enter — copies a generic edit prompt to clipboard), and cancel (Escape — reverts). When the user pastes the copied prompt, handle it as a regular code change.
+The runtime is a React client component (`app/__budge.tsx`). It handles everything client-side: live preview, DOM cleanup, submit (Enter — copies a generic edit prompt to clipboard), and cancel (Escape — reverts). When the user pastes the copied prompt, handle it as a regular code change.
 
 **In scope:** Raw CSS property values, inline styles, Tailwind utility class changes, SVG presentation attributes (`fill`, `stroke`, etc.).
 **Out of scope:** Sass/Less variables, CSS custom property definitions (`--spacing`), CSS-in-JS theme tokens. Proceed normally for these.
 
 ## Installation
 
-Grep for `__nudge` in the project. If found, skip to **Step 1**. Otherwise, read `references/INSTALL.md` and follow its instructions.
+Grep for `__budge` in the project. If found, skip to **Step 1**. Otherwise, read `references/INSTALL.md` and follow its instructions.
 
 ---
 
 ## Troubleshooting — bar does not appear
 
-1. **Component missing:** Confirm `app/__nudge.tsx` exists and `<Nudge />` is rendered in `app/layout.tsx`.
+1. **Component missing:** Confirm `app/__budge.tsx` exists and `<Budge />` is rendered in `app/layout.tsx`.
 2. **sessionStorage:** Dismissing with Escape sets `sessionStorage['__ndg_dismissed']` to a hash of the config. Same property/original/value will not show again until that key is cleared or the config hash changes.
-3. **Target not found:** The element with `data-nudge-target` must be in the DOM after hydration. If it's inside a lazily-rendered client component, the runtime's `MutationObserver` will find it once it mounts.
+3. **Target not found:** The element with `data-budge-target` must be in the DOM after hydration. If it's inside a lazily-rendered client component, the runtime's `MutationObserver` will find it once it mounts.
 
 ---
 
@@ -37,7 +37,7 @@ After making a change, apply this mechanical test. Do NOT use subjective judgmen
 **Pass:** `padding: 8px` → `padding: 16px` | `className="p-2 m-4"` → `className="p-4 m-4"`
 **Fail:** two values changed, token added/removed, Sass variable, multiple StrReplace calls, structural change.
 
-Fail → skip nudge, proceed normally. Pass → continue to Step 2. The mechanical test is the only gate.
+Fail → skip budge, proceed normally. Pass → continue to Step 2. The mechanical test is the only gate.
 
 ## Step 2 — Determine Config
 
@@ -84,32 +84,32 @@ Resolve Tailwind spacing scale to pixels: multiply the value by 4 (`p-4` = `16px
 
 ## Step 3 — Mark Target Element
 
-Add `data-nudge-target` to the changed element in source:
+Add `data-budge-target` to the changed element in source:
 
 ```jsx
-<div data-nudge-target style={{ padding: '16px' }}>
+<div data-budge-target style={{ padding: '16px' }}>
 ```
 
 For Tailwind classes, also add an inline style override so the runtime can manipulate the value directly:
 
 ```jsx
-<div data-nudge-target className="py-4" style={{ paddingTop: '16px', paddingBottom: '16px' }}>
+<div data-budge-target className="py-4" style={{ paddingTop: '16px', paddingBottom: '16px' }}>
 ```
 
 For SVG presentation attributes, mark the element that carries the attribute:
 
 ```jsx
-<path data-nudge-target fill="#B8B8B8" d="..." />
+<path data-budge-target fill="#B8B8B8" d="..." />
 ```
 
 ## Step 4 — Activate
 
-Use `StrReplace` to update the `<Nudge />` component in `app/layout.tsx`, passing a `config` prop:
+Use `StrReplace` to update the `<Budge />` component in `app/layout.tsx`, passing a `config` prop:
 
 **Numeric example (lengths):**
 
 ```tsx
-<Nudge config={{
+<Budge config={{
   property: "padding",
   value: "16px",
   original: "8px",
@@ -123,7 +123,7 @@ Use `StrReplace` to update the `<Nudge />` component in `app/layout.tsx`, passin
 **Color example:**
 
 ```tsx
-<Nudge config={{
+<Budge config={{
   property: "color",
   value: "#1a1a1a",
   original: "#333333",
@@ -136,7 +136,7 @@ Use `StrReplace` to update the `<Nudge />` component in `app/layout.tsx`, passin
 **SVG fill example:**
 
 ```tsx
-<Nudge config={{
+<Budge config={{
   property: "fill",
   value: "#B8B8B8",
   original: "#CDCDCD",
@@ -149,7 +149,7 @@ Use `StrReplace` to update the `<Nudge />` component in `app/layout.tsx`, passin
 **Options example (font-weight):**
 
 ```tsx
-<Nudge config={{
+<Budge config={{
   property: "font-weight",
   value: "600",
   original: "400",
@@ -166,4 +166,4 @@ Use `StrReplace` to update the `<Nudge />` component in `app/layout.tsx`, passin
 
 Tell the user: "I've changed X to Y. Use arrow keys on the page to fine-tune it."
 
-The runtime handles submit, cancel, target marker removal, and sessionStorage dismiss. When the user pastes the submitted prompt, it reads as a normal edit instruction — make the edit and reset the config back to `<Nudge />`.
+The runtime handles submit, cancel, target marker removal, and sessionStorage dismiss. When the user pastes the submitted prompt, it reads as a normal edit instruction — make the edit and reset the config back to `<Budge />`.

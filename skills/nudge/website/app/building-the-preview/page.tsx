@@ -126,7 +126,7 @@ export default function BuildingThePreviewPage() {
 
             <Section title="Physics">
               <P>
-                What makes a physical button satisfying is asymmetry: fast snap on press, slow springy recovery on release. If both halves were the same speed it would feel mushy. The bar&apos;s background subtly stretches in the direction of the nudge — barely perceptible, but it registers subconsciously. At idle, the bar recedes; the moment you interact, it snaps to full presence.
+                What makes a physical button satisfying is asymmetry: fast snap on press, slow springy recovery on release. If both halves were the same speed it would feel mushy. The bar&apos;s background subtly stretches in the direction of the budge — barely perceptible, but it registers subconsciously. At idle, the bar recedes; the moment you interact, it snaps to full presence.
               </P>
               <Demo>
                 <BudgeMePaperPreview features={STAGE_4} />

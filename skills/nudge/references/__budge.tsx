@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Calligraph } from "calligraph";
 
-export interface NudgeConfig {
+export interface BudgeConfig {
   property: string;
   value: string;
   original: string;
@@ -224,7 +224,7 @@ function fallbackCopy(text: string) {
 // Config hash for sessionStorage dismiss
 // ---------------------------------------------------------------------------
 
-function configHash(c: NudgeConfig) {
+function configHash(c: BudgeConfig) {
   return c.property + ":" + c.original + ":" + c.value;
 }
 
@@ -236,7 +236,7 @@ function getProps(property: string) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function Nudge({ config }: { config?: NudgeConfig | null }) {
+export function Budge({ config }: { config?: BudgeConfig | null }) {
   if (process.env.NODE_ENV === "production") return null;
 
   const [mounted, setMounted] = useState(false);
@@ -247,7 +247,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const [confirmed, setConfirmed] = useState(false);
   const [barVisible, setBarVisible] = useState(false);
   const [barMounted, setBarMounted] = useState(false);
-  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const lastIsColorRef = useRef(false);
 
   if (config) lastIsColorRef.current = config.type === "color";
@@ -259,17 +259,17 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
   const unitRef = useRef("");
   const optionIndexRef = useRef(0);
   const currentValueRef = useRef("");
-  const nudgeTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const stepValueRef = useRef<((direction: number, shift: boolean) => void) | undefined>(undefined);
+  const budgeTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const stepValueRef = useRef<(direction: number, shift: boolean) => void>();
 
-  const triggerNudge = useCallback(
+  const triggerBudge = useCallback(
     (dir: "up" | "down") => {
       const direction = dir === "up" ? 1 : -1;
       stepValueRef.current?.(direction, false);
       setActiveKey(dir);
       setIsNudging(true);
-      clearTimeout(nudgeTimeoutRef.current);
-      nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+      clearTimeout(budgeTimeoutRef.current);
+      budgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       setTimeout(() => setActiveKey(null), 100);
     },
     []
@@ -277,6 +277,12 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
 
   useEffect(() => {
     setMounted(true);
+    if (!document.querySelector('link[href*="open-runde"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://fonts.cdnfonts.com/css/open-runde";
+      document.head.appendChild(link);
+    }
   }, []);
 
   // Reset state when config changes
@@ -340,7 +346,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     }
 
     const find = () =>
-      document.querySelector("[data-nudge-target]") as Element | null;
+      document.querySelector("[data-budge-target]") as Element | null;
     const firstProp = getProps(config.property)[0];
     const found = find();
     if (found) {
@@ -386,7 +392,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
       sessionStorage.setItem("__ndg_dismissed", configHash(config));
     }
     if (targetEl) {
-      targetEl.removeAttribute("data-nudge-target");
+      targetEl.removeAttribute("data-budge-target");
     }
     setDismissed(true);
     setTargetEl(null);
@@ -453,8 +459,8 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
       copyToClipboard(buildPrompt());
       setConfirmed(true);
       setIsNudging(true);
-      clearTimeout(nudgeTimeoutRef.current);
-      nudgeTimeoutRef.current = setTimeout(() => {
+      clearTimeout(budgeTimeoutRef.current);
+      budgeTimeoutRef.current = setTimeout(() => {
         setConfirmed(false);
         dismiss();
       }, 800);
@@ -496,8 +502,8 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
           unitRef.current = match[2];
         }
         setIsNudging(true);
-        clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+        clearTimeout(budgeTimeoutRef.current);
+        budgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       } else if (e.key === "Escape") {
         e.preventDefault();
         handleCancel();
@@ -509,15 +515,15 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
         stepValue(1, e.shiftKey);
         setActiveKey("up");
         setIsNudging(true);
-        clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+        clearTimeout(budgeTimeoutRef.current);
+        budgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         stepValue(-1, e.shiftKey);
         setActiveKey("down");
         setIsNudging(true);
-        clearTimeout(nudgeTimeoutRef.current);
-        nudgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
+        clearTimeout(budgeTimeoutRef.current);
+        budgeTimeoutRef.current = setTimeout(() => setIsNudging(false), 600);
       }
     }
 
@@ -532,7 +538,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
-      clearTimeout(nudgeTimeoutRef.current);
+      clearTimeout(budgeTimeoutRef.current);
     };
   }, [config, targetEl, dismissed, applyPreview, dismiss]);
 
@@ -546,7 +552,7 @@ export function Nudge({ config }: { config?: NudgeConfig | null }) {
           activeKey={activeKey}
           isColor={lastIsColorRef.current}
           expanded={isNudging}
-          onNudge={triggerNudge}
+          onBudge={triggerBudge}
           confirmed={confirmed}
           visible={barVisible}
         />
@@ -820,7 +826,7 @@ function Bar({
   activeKey,
   isColor,
   expanded,
-  onNudge,
+  onBudge,
   confirmed,
   visible,
 }: {
@@ -828,7 +834,7 @@ function Bar({
   activeKey: "up" | "down" | null;
   isColor: boolean;
   expanded: boolean;
-  onNudge: (direction: "up" | "down") => void;
+  onBudge: (direction: "up" | "down") => void;
   confirmed: boolean;
   visible: boolean;
 }) {
@@ -843,7 +849,7 @@ function Bar({
     "opacity 0.15s ease";
 
   const baseScale = !visible ? 0.5 : confirmed ? 1.05 : expanded ? 1 : 0.85;
-  const nudgeY = activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0;
+  const budgeY = activeKey === "down" ? 1 : activeKey === "up" ? -1 : 0;
 
   return (
     <div
@@ -851,7 +857,7 @@ function Bar({
         position: "fixed",
         bottom: expanded ? 20 : 12,
         left: "50%",
-        transform: `translateX(-50%) translateY(${nudgeY}px) scale(${baseScale})`,
+        transform: `translateX(-50%) translateY(${budgeY}px) scale(${baseScale})`,
         opacity: visible ? 1 : 0,
         zIndex: 2147483647,
         display: "flex",
@@ -920,8 +926,8 @@ function Bar({
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <Arrow down active={activeKey === "down"} onClick={() => onNudge("down")} />
-            <Arrow active={activeKey === "up"} onClick={() => onNudge("up")} />
+            <Arrow down active={activeKey === "down"} onClick={() => onBudge("down")} />
+            <Arrow active={activeKey === "up"} onClick={() => onBudge("up")} />
           </div>
         </>
       )}

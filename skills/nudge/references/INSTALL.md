@@ -1,4 +1,4 @@
-# Nudge Installation (Next.js App Router)
+# Budge Installation (Next.js App Router)
 
 Three steps. The component is inert when no config prop is passed — safe to leave permanently.
 
@@ -10,25 +10,25 @@ npm install calligraph motion
 
 ## 2. Copy the Component
 
-Copy `references/__nudge.tsx` from this skill into the project:
+Copy `references/__budge.tsx` from this skill into the project:
 
 ```
-app/__nudge.tsx
+app/__budge.tsx
 ```
 
 ## 3. Add to Root Layout
 
-In `app/layout.tsx`, import and render `<Nudge />` inside `<body>`:
+In `app/layout.tsx`, import and render `<Budge />` inside `<body>`:
 
 ```tsx
-import { Nudge } from "./__nudge";
+import { Budge } from "./__budge";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
         {children}
-        <Nudge />
+        <Budge />
       </body>
     </html>
   );

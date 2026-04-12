@@ -190,7 +190,7 @@
 }
 
 .page-content,
-.page-content *:not(.budge-me-paper-preview *) {
+.page-content *:not(.budge-paper-preview *) {
   font-family:
     system-ui,
     -apple-system,

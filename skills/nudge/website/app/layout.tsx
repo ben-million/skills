@@ -4,7 +4,7 @@ import { ThemeProvider } from "next-themes";
 import { Analytics } from "@vercel/analytics/next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ReactGrab } from "./react-grab";
-import { Nudge } from "./__nudge";
+import { Budge } from "./__budge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -67,7 +67,7 @@ export default function RootLayout({
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
         <ReactGrab />
-        <Nudge />
+        <Budge />
         {process.env.VERCEL && <Analytics />}
       </body>
     </html>
