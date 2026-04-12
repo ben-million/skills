@@ -1,6 +1,6 @@
 import { codeToHtml } from "shiki";
 
-const USAGE_CODE = `<script src="budge.iife.js"></script>
+const USAGE_CODE = `<script src="https://budge.dev/budge.iife.js"></script>
 <script>
   Budge.widget.mount(document.body, {
     config: {
