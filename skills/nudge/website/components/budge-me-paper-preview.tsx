@@ -633,7 +633,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               </div>
               <div
                 ref={muteRef}
-                className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer outline-none"
+                className="group flex items-center justify-center rounded-full bg-white [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] shrink-0 size-9 cursor-pointer outline-none overflow-visible"
                 onClick={() => {
                   setMuted(m => !m);
                   if (f.buttonFeedback) { setPressedButton("mute"); setTimeout(() => setPressedButton(null), 70); }
@@ -657,7 +657,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                     : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
                 } : undefined}
               >
-                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-colors duration-200" style={{ width: 18, height: "auto", flexShrink: 0 }}>
+                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-colors duration-200" style={{ width: 18, height: "auto", flexShrink: 0, overflow: "visible" }}>
                   {muted ? (
                     <>
                       <path fillRule="evenodd" clipRule="evenodd" d="M14 6C14 4.352 12.118 3.411 10.8 4.4L6.712 7.466L4.299 7.225C2.532 7.048 1 8.435 1 10.21V13.79C1 15.565 2.532 16.952 4.299 16.775L6.712 16.534L10.8 19.6C12.118 20.589 14 19.648 14 18V6Z" className="fill-[#B0B0B0] group-hover:fill-[#777]" />
