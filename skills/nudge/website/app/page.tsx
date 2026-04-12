@@ -9,8 +9,8 @@ import { BudgeMePaperPreview } from "@/components/budge-me-paper-preview";
 
 export default function HomePage() {
   return (
-    <div className="[font-synthesis:none] overflow-x-clip antialiased min-h-screen bg-[oklch(98.6%_0.002_67.8)] flex flex-col items-center">
-      <div className="page-content w-full flex flex-col items-center pt-3 sm:pt-6">
+    <div className="[font-synthesis:none] overflow-x-clip antialiased min-h-screen bg-[oklch(98.6%_0.002_67.8)] flex flex-col items-center justify-center">
+      <div className="page-content w-full flex flex-col items-center py-12">
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0">
           <div className="mb-0 mt-8 left-0 top-0 w-full min-w-0 [white-space-collapse:preserve] relative text-[#3F3F3F] font-semibold text-[15px]/[22px]">
             budge
