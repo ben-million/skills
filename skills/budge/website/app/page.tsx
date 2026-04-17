@@ -42,6 +42,9 @@ export default function HomePage() {
           <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#707070] mt-6">
             Use ↑↓ to nudge the value, ←→ to switch between properties. Press Enter to copy a prompt to your clipboard, then paste it back to your agent. Press Escape to dismiss.
           </div>
+          <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#707070] mt-4">
+            If your project defines design tokens as CSS custom properties (<code className="font-mono-override text-[#3F3F3F]">--spacing-md</code>, <code className="font-mono-override text-[#3F3F3F]">--radius-lg</code>, etc.), ↑↓ snaps through the scale and the copied prompt reads <code className="font-mono-override text-[#3F3F3F]">var(--spacing-md)</code> instead of raw pixels. Works with Tailwind v4&rsquo;s <code className="font-mono-override text-[#3F3F3F]">@theme</code>, Shadcn, or any <code className="font-mono-override text-[#3F3F3F]">:root</code> variables. Press <code className="font-mono-override text-[#3F3F3F]">T</code> to toggle.
+          </div>
           <div className="overflow-x-auto rounded-[14px] mt-6 border border-solid border-[color(display-p3_1_1_1)] [box-shadow:#0000000F_0px_0px_0px_1px,#0000000F_0px_1px_2px_-1px,#0000000A_0px_2px_4px] bg-[color(display-p3_0.991_0.991_0.991)]">
             <table className="w-full text-[13px]/[20px] font-mono">
               <thead>
@@ -59,7 +62,9 @@ export default function HomePage() {
                 <tr className="border-b border-[color(display-p3_0_0_0/0.04)]"><td className="px-3 py-2">value</td><td className="px-3 py-2 text-[#999]">number</td><td className="px-3 py-2">Current value</td></tr>
                 <tr className="border-b border-[color(display-p3_0_0_0/0.04)]"><td className="px-3 py-2">original</td><td className="px-3 py-2 text-[#999]">number</td><td className="px-3 py-2">Value before the change</td></tr>
                 <tr className="border-b border-[color(display-p3_0_0_0/0.04)]"><td className="px-3 py-2">unit</td><td className="px-3 py-2 text-[#999]">string</td><td className="px-3 py-2">{'"px"'}, {'"%"'}, {'"em"'}, etc.</td></tr>
-                <tr><td className="px-3 py-2">type</td><td className="px-3 py-2 text-[#999]">{'"color"?'}</td><td className="px-3 py-2">Only set for color properties</td></tr>
+                <tr className="border-b border-[color(display-p3_0_0_0/0.04)]"><td className="px-3 py-2">type</td><td className="px-3 py-2 text-[#999]">{'"color"?'}</td><td className="px-3 py-2">Only set for color properties</td></tr>
+                <tr className="border-b border-[color(display-p3_0_0_0/0.04)]"><td className="px-3 py-2">scale</td><td className="px-3 py-2 text-[#999]">{'"spacing" | "radius" | "text" | "color" | null?'}</td><td className="px-3 py-2">Override auto-detected token scale</td></tr>
+                <tr><td className="px-3 py-2">tokens</td><td className="px-3 py-2 text-[#999]">BudgeToken[]?</td><td className="px-3 py-2">Explicit tokens (overrides CSS-var discovery)</td></tr>
               </tbody>
             </table>
           </div>

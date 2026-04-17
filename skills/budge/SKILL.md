@@ -130,6 +130,21 @@ For Tailwind classes, also add an inline style override on the target element so
 <div data-budge-target className="py-4" style={{ paddingTop: '16px', paddingBottom: '16px' }}>
 ```
 
+### Design token snapping
+
+If the project defines design tokens as CSS custom properties on `:root` or `@theme` (Tailwind v4, Shadcn, plain CSS vars), the runtime automatically snaps ↑/↓ stepping through them by matching property to scale:
+
+| Property match | Discovered prefix |
+|---|---|
+| `padding*`, `margin*`, `gap` | `--spacing-*` |
+| `font-size` | `--text-*` |
+| `border-radius*` | `--radius-*` |
+| `color`, `*-color` | `--color-*` (no snap yet — palette cycling is a follow-up) |
+
+When a token matches the current value, the widget shows its name (e.g. `16px · md`) and Enter emits `Set \`padding\` to \`var(--spacing-md)\`` instead of a raw px value. Users can still type digits to escape to arbitrary px.
+
+You don't need to specify `scale` on slides — it's auto-detected from `property`. Pass `scale: null` to disable snapping for a slide, or `scale: "spacing" | "text" | "radius" | "color"` to override. Pass `tokens: [{ name, value, numeric }]` to override discovery entirely. Use `unit: "px"` when relying on token snapping (the runtime applies the token's raw value so rem/em tokens resolve correctly regardless).
+
 ## Step 3 — Mark Target Element
 
 Add `data-budge-target` to the changed element in source:

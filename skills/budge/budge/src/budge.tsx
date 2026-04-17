@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calligraph } from "calligraph";
+import type { ReactNode } from "react";
+import { Calligraph as CalligraphImport } from "calligraph";
+
+const Calligraph: any = typeof CalligraphImport === "function"
+  ? CalligraphImport
+  : ({ children, style }: { children?: ReactNode; style?: React.CSSProperties }) => (
+      <span style={style}>{children}</span>
+    );
 
 let assetBase = "";
 
@@ -15,6 +22,14 @@ const SHAKE_KEYFRAMES = `@keyframes __budge-shake{0%,100%{translate:0}25%{transl
 let shakeInjected = false;
 const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
+export type BudgeScale = "spacing" | "color" | "text" | "radius";
+
+export interface BudgeToken {
+  name: string;
+  value: string;
+  numeric?: number;
+}
+
 export interface BudgeSlide {
   label: string;
   property: string;
@@ -24,6 +39,99 @@ export interface BudgeSlide {
   original: number;
   unit: string;
   type?: "numeric" | "color";
+  scale?: BudgeScale | null;
+  tokens?: BudgeToken[];
+}
+
+type TokenBuckets = Record<BudgeScale, BudgeToken[]>;
+
+const EMPTY_BUCKETS: TokenBuckets = { spacing: [], color: [], text: [], radius: [] };
+
+function defaultScaleForProperty(property: string): BudgeScale | null {
+  if (/^(padding|margin|gap)(-|$)/.test(property)) return "spacing";
+  if (property === "color" || /-color$/.test(property)) return "color";
+  if (property === "font-size") return "text";
+  if (/^border-radius/.test(property)) return "radius";
+  return null;
+}
+
+function parseLengthToPx(value: string): number | undefined {
+  const m = value.trim().match(/^(-?[\d.]+)(px|rem|em)?$/);
+  if (!m) return undefined;
+  const n = parseFloat(m[1]);
+  const unit = m[2] || "px";
+  if (unit === "rem" || unit === "em") return n * 16;
+  return n;
+}
+
+function discoverTokens(): TokenBuckets {
+  if (typeof document === "undefined") return { spacing: [], color: [], text: [], radius: [] };
+  const cs = getComputedStyle(document.documentElement);
+  const out: TokenBuckets = { spacing: [], color: [], text: [], radius: [] };
+  const prefixes: [string, BudgeScale][] = [
+    ["--spacing-", "spacing"],
+    ["--color-", "color"],
+    ["--text-", "text"],
+    ["--radius-", "radius"],
+  ];
+  for (let i = 0; i < cs.length; i++) {
+    const prop = cs.item(i);
+    if (!prop.startsWith("--")) continue;
+    for (const [prefix, scale] of prefixes) {
+      if (!prop.startsWith(prefix)) continue;
+      const name = prop.slice(prefix.length);
+      const raw = cs.getPropertyValue(prop).trim();
+      if (!raw) break;
+      if (scale === "color") {
+        out.color.push({ name, value: raw });
+      } else {
+        const numeric = parseLengthToPx(raw);
+        if (numeric === undefined || isNaN(numeric)) break;
+        out[scale].push({ name, value: raw, numeric });
+      }
+      break;
+    }
+  }
+  for (const k of ["spacing", "text", "radius"] as const) {
+    out[k].sort((a, b) => (a.numeric ?? 0) - (b.numeric ?? 0));
+  }
+  return out;
+}
+
+function resolveScale(slide: BudgeSlide): BudgeScale | null {
+  return slide.scale !== undefined ? slide.scale : defaultScaleForProperty(slide.property);
+}
+
+function tokensForSlide(slide: BudgeSlide, discovered: TokenBuckets): BudgeToken[] | null {
+  const scale = resolveScale(slide);
+  if (!scale) return null;
+  const tokens = slide.tokens ?? discovered[scale];
+  return tokens.length > 0 ? tokens : null;
+}
+
+function matchToken(tokens: BudgeToken[], value: number, epsilon = 0.5): BudgeToken | null {
+  for (const t of tokens) {
+    if (t.numeric !== undefined && Math.abs(t.numeric - value) < epsilon) return t;
+  }
+  return null;
+}
+
+function nextTokenIndex(tokens: BudgeToken[], value: number, direction: number, shift: boolean): number {
+  let curIdx = 0, bestDist = Infinity;
+  for (let i = 0; i < tokens.length; i++) {
+    const d = Math.abs((tokens[i].numeric ?? 0) - value);
+    if (d < bestDist) { bestDist = d; curIdx = i; }
+  }
+  const onToken = Math.abs((tokens[curIdx].numeric ?? 0) - value) < 0.5;
+  const mult = shift ? 10 : 1;
+  if (onToken) return curIdx + direction * mult;
+  if (direction > 0) {
+    for (let i = 0; i < tokens.length; i++) if ((tokens[i].numeric ?? 0) > value) return i;
+    return tokens.length;
+  } else {
+    for (let i = tokens.length - 1; i >= 0; i--) if ((tokens[i].numeric ?? 0) < value) return i;
+    return -1;
+  }
 }
 
 const DEFAULT_SLIDES: BudgeSlide[] = [
@@ -242,6 +350,15 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
   const valueRef = useRef(SLIDES[0].value);
   const holdIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const discoveredRef = useRef<TokenBuckets>(EMPTY_BUCKETS);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const snapEnabledRef = useRef(true);
+  const [toastLabel, setToastLabel] = useState<string | null>(null);
+  const toastLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    discoveredRef.current = discoverTokens();
+  }, []);
 
   useEffect(() => {
     if (!shakeInjected) {
@@ -279,7 +396,13 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
     const el = document.querySelector("[data-budge-target]") as HTMLElement | null;
     if (!el) return;
     const cs = SLIDES[slide];
-    if (cs.type === "color") el.style.setProperty(cs.property, `hsl(${value}, 70%, 55%)`);
+    const scale = resolveScale(cs);
+    const snapTokens = snapEnabled && scale && scale !== "color"
+      ? tokensForSlide(cs, discoveredRef.current)
+      : null;
+    const matched = snapTokens ? matchToken(snapTokens, value) : null;
+    if (matched) el.style.setProperty(cs.property, matched.value);
+    else if (cs.type === "color") el.style.setProperty(cs.property, `hsl(${value}, 70%, 55%)`);
     else if (cs.unit === "%") el.style.setProperty(cs.property, String(value / 100));
     else el.style.setProperty(cs.property, `${value}${cs.unit}`);
   }, [value, slide, SLIDES]);
@@ -337,9 +460,24 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
 
   const step = useCallback((direction: number, shift = false, held = false) => {
     const cs = SLIDES[slideRef.current];
-    const mult = (f.shiftStep && shift) ? 10 : 1;
-    const next = valueRef.current + direction * mult;
-    if (next > cs.max || next < cs.min) {
+    const scale = resolveScale(cs);
+    const snapTokens = snapEnabledRef.current && scale && scale !== "color"
+      ? tokensForSlide(cs, discoveredRef.current)
+      : null;
+
+    let next: number | null = null;
+    if (snapTokens) {
+      const idx = nextTokenIndex(snapTokens, valueRef.current, direction, shift);
+      if (idx >= 0 && idx < snapTokens.length) {
+        next = snapTokens[idx].numeric ?? null;
+      }
+    } else {
+      const mult = (f.shiftStep && shift) ? 10 : 1;
+      const candidate = valueRef.current + direction * mult;
+      if (candidate >= cs.min && candidate <= cs.max) next = candidate;
+    }
+
+    if (next === null) {
       if (f.boundaryShake) {
         setShaking(true);
         clearTimeout(shakeTimeoutRef.current);
@@ -347,7 +485,7 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
       }
       boundaryHitsRef.current++;
       if (boundaryHitsRef.current >= 20) {
-        const label = next > cs.max ? "Max" : "Min";
+        const label = direction > 0 ? "Max" : "Min";
         setBoundaryLabel(label);
         clearTimeout(boundaryLabelTimeoutRef.current);
         clearTimeout(boundaryLabelExitRef.current);
@@ -361,7 +499,7 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
           boundaryLabelExitRef.current = setTimeout(() => setBoundaryLabel(null), 300);
         }, 400);
       }
-      if (soundOn) playBoundary(next > cs.max);
+      if (soundOn) playBoundary(direction > 0);
       return;
     }
     atBoundary = false;
@@ -436,7 +574,14 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
   const copy = useCallback(() => {
     const idx = slideRef.current;
     const cs = SLIDES[idx];
-    const val = cs.type === "color" ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${cs.unit}`;
+    const scale = resolveScale(cs);
+    const snapTokens = snapEnabledRef.current && scale && scale !== "color"
+      ? tokensForSlide(cs, discoveredRef.current)
+      : null;
+    const matched = snapTokens ? matchToken(snapTokens, valueRef.current) : null;
+    const val = matched && scale
+      ? `var(--${scale}-${matched.name})`
+      : cs.type === "color" ? `hsl(${valueRef.current}, 70%, 55%)` : `${valueRef.current}${cs.unit}`;
     const prompt = `Set \`${cs.property}\` to \`${val}\``;
     navigator.clipboard?.writeText(prompt);
     setShowPrompt(true);
@@ -524,6 +669,21 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
       } else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         resetRef.current();
+      } else if ((e.key === "t" || e.key === "T") && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        const next = !snapEnabledRef.current;
+        snapEnabledRef.current = next;
+        setSnapEnabled(next);
+        setToastLabel(next ? "token snap on" : "token snap off");
+        clearTimeout(slideRangeTimeoutRef.current);
+        clearTimeout(toastLabelTimeoutRef.current);
+        setSlideRangeVisible(true);
+        setSlideRangeIdle(false);
+        toastLabelTimeoutRef.current = setTimeout(() => {
+          setToastLabel(null);
+          setSlideRangeVisible(false);
+          setTimeout(() => setSlideRangeIdle(true), 400);
+        }, 1200);
       } else if (e.key === "Enter") {
         e.preventDefault();
         copyRef.current();
@@ -562,8 +722,17 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
     const n = parseInt(typedRaw, 10);
     return !isNaN(n) && (n < s.min || n > s.max);
   })();
-  const atMin = value <= s.min;
-  const atMax = value >= s.max;
+  const activeScale = resolveScale(s);
+  const activeSnapTokens = snapEnabled && activeScale && activeScale !== "color"
+    ? tokensForSlide(s, discoveredRef.current)
+    : null;
+  const matchedToken = activeSnapTokens ? matchToken(activeSnapTokens, value) : null;
+  const atMin = activeSnapTokens
+    ? value <= (activeSnapTokens[0].numeric ?? s.min)
+    : value <= s.min;
+  const atMax = activeSnapTokens
+    ? value >= (activeSnapTokens[activeSnapTokens.length - 1].numeric ?? s.max)
+    : value >= s.max;
   const isColorSlide = s.type === "color";
   const targetColor = `hsl(${value}, 70%, 55%)`;
   const budgeY = 0;
@@ -638,11 +807,11 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
               fontFamily: FONT,
               fontSize: 12,
               fontWeight: 500,
-              color: "#666",
+              color: toastLabel ? "#888" : "#666",
               letterSpacing: "0.01em",
               whiteSpace: "nowrap",
             }}>
-              {SLIDES[slide].label}
+              {toastLabel ?? SLIDES[slide].label}
             </span>
           </div>
           <div style={{
@@ -677,8 +846,8 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
             <>
               <div
                 style={{
-                  maxWidth: isBudging && !isColorSlide ? 100 : 0,
-                  marginRight: isBudging && !isColorSlide ? 1 : 0,
+                  maxWidth: isBudging && !isColorSlide ? (matchedToken ? 170 : 100) : 0,
+                  marginRight: isBudging && !isColorSlide ? (matchedToken ? 9 : 1) : 0,
                   opacity: isBudging && !isColorSlide ? 1 : 0,
                   transition: isBudging
                     ? expandTransition
@@ -716,6 +885,20 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
                       transition: "color 0.2s ease",
                       marginLeft: 1,
                     }}>{displayUnit}</span>
+                    {matchedToken && (
+                      <span style={{
+                        color: shaking ? "#A7A7A7" : "#A7A7A7",
+                        fontFamily: FONT,
+                        fontWeight: 500,
+                        fontSize: 11,
+                        lineHeight: "22px",
+                        marginLeft: 6,
+                        whiteSpace: "nowrap",
+                        display: "inline-block",
+                        minWidth: 32,
+                        textAlign: "left",
+                      }}>· {matchedToken.name}</span>
+                    )}
                   </span>
                 ) : (
                   <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 44, textAlign: "left" }}>
@@ -742,6 +925,20 @@ export function Budge({ autoFocus, slides: slidesProp }: { autoFocus?: boolean; 
                       transition: "color 0.2s ease",
                       marginLeft: 1,
                     }}>{displayUnit}</span>
+                    {matchedToken && (
+                      <span style={{
+                        color: "#A7A7A7",
+                        fontFamily: FONT,
+                        fontWeight: 500,
+                        fontSize: 11,
+                        lineHeight: "22px",
+                        marginLeft: 6,
+                        whiteSpace: "nowrap",
+                        display: "inline-block",
+                        minWidth: 32,
+                        textAlign: "left",
+                      }}>· {matchedToken.name}</span>
+                    )}
                   </span>
                 )}
               </div>

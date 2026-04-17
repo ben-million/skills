@@ -8,14 +8,15 @@
     "dev": "isolet build --watch"
   },
   "devDependencies": {
+    "@number-flow/react": "^0.6.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "calligraph": "^1.4.1",
     "isolet-js": "^0.0.7",
+    "motion": "^11.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "typescript": "^5.8.0"
   },
-  "dependencies": {
-    "@number-flow/react": "^0.6.0"
-  }
+  "dependencies": {}
 }
