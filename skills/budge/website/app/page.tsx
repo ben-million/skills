@@ -16,14 +16,16 @@ export default function HomePage() {
             <BudgeLogo>budge</BudgeLogo>
           </div>
           <div className="[letter-spacing:0em] [white-space-collapse:preserve] mt-[17px] mb-6 font-medium text-[15px]/[22px] text-[#696969]">
-            the tiny design companion for your agent
+            An agent skill to tweak UI without going back-and-forth with AI
           </div>
-          <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#707070]">
-            &ldquo;add space above X&rdquo; or &ldquo;make Y less subtle&rdquo; gets you 90% of the
-            way there. budge is for the last 10.
-          </div>
+          <ul className="[letter-spacing:0em] font-medium text-[15px]/[22px] text-[#707070] list-none p-0 m-0 space-y-1">
+            <li>↑↓ to fine-tune the value</li>
+            <li>←→ to switch between properties</li>
+            <li>T to snap to design tokens</li>
+            <li>Enter to copy the prompt to clipboard</li>
+          </ul>
           <div className="[letter-spacing:0em] [white-space-collapse:preserve] font-medium text-[15px]/[22px] text-[#707070] mt-4">
-            budge appears when your agent makes a change to your UI. Tweak the value (padding, margin, color) then copy the result back to your agent to lock it in. It works just like the nudge feature in your favourite design tool.
+            Works in Claude Code, Codex, Cursor. Fully open source.
           </div>
         </div>
         <div className="relative w-full max-w-112.75 min-w-0 px-4 sm:px-0 pb-6">

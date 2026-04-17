@@ -11,12 +11,67 @@ const ARROW_D =
   "M13.415 2.5C12.634 1.719 11.367 1.719 10.586 2.5L3.427 9.659C2.01 11.076 3.014 13.5 5.018 13.5H7V20C7 21.104 7.895 22 9 22H15C16.105 22 17 21.104 17 20V13.5H18.983C20.987 13.5 21.991 11.076 20.574 9.659L13.415 2.5Z";
 const ORIGINAL = 61;
 
-const SLIDES = [
-  { label: "font size", min: 32, max: 86, original: 61, unit: "px", demo: 48 },
+type Token = { name: string; value: number };
+
+const SLIDES: {
+  label: string;
+  min: number;
+  max: number;
+  original: number;
+  unit: string;
+  demo: number;
+  tokens?: Token[];
+}[] = [
+  {
+    label: "font size",
+    min: 32,
+    max: 86,
+    original: 61,
+    unit: "px",
+    demo: 48,
+    tokens: [
+      { name: "sm", value: 36 },
+      { name: "md", value: 48 },
+      { name: "lg", value: 61 },
+      { name: "xl", value: 72 },
+      { name: "2xl", value: 86 },
+    ],
+  },
   { label: "opacity", min: 0, max: 100, original: 100, unit: "%", demo: 20 },
-  { label: "padding", min: 6, max: 48, original: 16, unit: "px", demo: 6 },
+  {
+    label: "padding",
+    min: 6,
+    max: 48,
+    original: 16,
+    unit: "px",
+    demo: 6,
+    tokens: [
+      { name: "xs", value: 6 },
+      { name: "sm", value: 10 },
+      { name: "md", value: 16 },
+      { name: "lg", value: 24 },
+      { name: "xl", value: 32 },
+      { name: "2xl", value: 48 },
+    ],
+  },
   { label: "color", min: 0, max: 360, original: 220, unit: "°", demo: 160 },
 ];
+
+function matchToken(tokens: Token[] | undefined, value: number): Token | null {
+  if (!tokens) return null;
+  return tokens.find((t) => Math.abs(t.value - value) < 0.5) ?? null;
+}
+
+function nextTokenValue(tokens: Token[], current: number, direction: 1 | -1): number | null {
+  const sorted = [...tokens].sort((a, b) => a.value - b.value);
+  if (direction > 0) {
+    const t = sorted.find((t) => t.value > current + 0.5);
+    return t ? t.value : null;
+  } else {
+    const t = [...sorted].reverse().find((t) => t.value < current - 0.5);
+    return t ? t.value : null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Audio — subtle haptic tick via Web Audio API
@@ -262,6 +317,38 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const valueRef = useRef(ORIGINAL);
   const holdIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [snapToTokens, setSnapToTokens] = useState(false);
+  const snapToTokensRef = useRef(snapToTokens);
+  snapToTokensRef.current = snapToTokens;
+  const snapMountedRef = useRef(false);
+  const [toastLabel, setToastLabel] = useState<string | null>(null);
+  const toastLabelTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "t" && e.key !== "T") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      setSnapToTokens((c) => !c);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (!snapMountedRef.current) {
+      snapMountedRef.current = true;
+      return;
+    }
+    setToastLabel(snapToTokens ? "token snap on" : "token snap off");
+    setSlideRangeVisible(true);
+    clearTimeout(toastLabelTimeoutRef.current);
+    clearTimeout(slideRangeTimeoutRef.current);
+    toastLabelTimeoutRef.current = setTimeout(() => {
+      setSlideRangeVisible(false);
+      setTimeout(() => setToastLabel(null), 300);
+    }, 1400);
+  }, [snapToTokens]);
 
   useEffect(() => {
     if (!shakeInjected) {
@@ -351,7 +438,13 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
   const step = useCallback((direction: number, shift = false, held = false) => {
     const cs = SLIDES[slideRef.current];
     const mult = (f.shiftStep && shift) ? 10 : 1;
-    const next = valueRef.current + direction * mult;
+    let next: number;
+    if (snapToTokensRef.current && cs.tokens && !shift) {
+      const tokenNext = nextTokenValue(cs.tokens, valueRef.current, direction > 0 ? 1 : -1);
+      next = tokenNext ?? (direction > 0 ? cs.max + 1 : cs.min - 1);
+    } else {
+      next = valueRef.current + direction * mult;
+    }
     if (next > cs.max || next < cs.min) {
       if (f.boundaryShake) {
         setShaking(true);
@@ -661,6 +754,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
 
   const displayNum = typedRaw !== null ? typedRaw : `${value}`;
   const displayUnit = s.unit;
+  const matchedToken = snapToTokens ? matchToken(s.tokens, value) : null;
   const typedOutOfRange = typedRaw !== null && (() => {
     const n = parseInt(typedRaw, 10);
     return !isNaN(n) && (n < s.min || n > s.max);
@@ -723,14 +817,9 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
         {f.showLabel !== false && (
           <div className="hidden sm:flex w-full items-center pt-3.5 px-4 shrink-0">
               <div className="size-9 shrink-0" />
-              <div className="flex-1 flex justify-center" style={{
-                opacity: hasUsedArrows ? 0 : 1,
-                filter: hasUsedArrows ? "blur(4px)" : "blur(0px)",
-                transition: "opacity 0.3s ease, filter 0.3s ease",
-                pointerEvents: hasUsedArrows ? "none" : "auto",
-              }}>
+              <div className="flex-1 flex justify-center">
                 <div className="[letter-spacing:0px] w-fit text-[color(display-p3_0.543_0.543_0.543)] font-sans font-medium text-xs/4.5">
-                  Arrow keys ← → to navigate
+                  Press T to snap to tokens
                 </div>
               </div>
               <div
@@ -865,7 +954,7 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
               letterSpacing: "0.01em",
               whiteSpace: "nowrap",
             }}>
-              {SLIDES[slide].label}
+              {toastLabel ?? SLIDES[slide].label}
             </span>
           </div>
           <div style={{
@@ -900,8 +989,8 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
             <>
               <div
                 style={{
-                  maxWidth: isBudging && !isColorSlide ? 100 : 0,
-                  marginRight: isBudging && !isColorSlide ? 1 : 0,
+                  maxWidth: isBudging && !isColorSlide ? (matchedToken ? 170 : 100) : 0,
+                  marginRight: isBudging && !isColorSlide ? (matchedToken ? 9 : 1) : 0,
                   opacity: isBudging && !isColorSlide ? 1 : 0,
                   transition: isBudging
                     ? expandTransition
@@ -939,6 +1028,20 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                       transition: "color 0.2s ease",
                       marginLeft: 1,
                     }}>{displayUnit}</span>
+                    {matchedToken && (
+                      <span style={{
+                        color: "#A7A7A7",
+                        fontFamily: FONT,
+                        fontWeight: 500,
+                        fontSize: 11,
+                        lineHeight: "22px",
+                        marginLeft: 6,
+                        whiteSpace: "nowrap",
+                        display: "inline-block",
+                        minWidth: 32,
+                        textAlign: "left",
+                      }}>· {matchedToken.name}</span>
+                    )}
                   </span>
                 ) : (
                   <span style={{ display: "inline-flex", alignItems: "baseline", minWidth: 44, textAlign: "left" }}>
@@ -965,6 +1068,20 @@ export function BudgeMePaperPreview({ features: f = ALL_FEATURES, autoFocus }: {
                       transition: "color 0.2s ease",
                       marginLeft: 1,
                     }}>{displayUnit}</span>
+                    {matchedToken && (
+                      <span style={{
+                        color: "#A7A7A7",
+                        fontFamily: FONT,
+                        fontWeight: 500,
+                        fontSize: 11,
+                        lineHeight: "22px",
+                        marginLeft: 6,
+                        whiteSpace: "nowrap",
+                        display: "inline-block",
+                        minWidth: 32,
+                        textAlign: "left",
+                      }}>· {matchedToken.name}</span>
+                    )}
                   </span>
                 )}
               </div>
