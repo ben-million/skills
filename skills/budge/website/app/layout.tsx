@@ -59,7 +59,7 @@ export default function RootLayout({
         </ThemeProvider>
         <ReactGrab />
         <Budge />
-        {process.env.VERCEL && <Analytics />}
+        <Analytics />
       </body>
     </html>
   );
