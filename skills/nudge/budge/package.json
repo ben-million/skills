@@ -1,0 +1,21 @@
+{
+  "name": "budge",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "isolet build --minify",
+    "dev": "isolet build --watch"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "isolet-js": "^0.0.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "@number-flow/react": "^0.6.0"
+  }
+}

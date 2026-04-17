@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --background: oklch(98.6% 0.002 67.8);
+  --foreground: oklch(0.145 0 0);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  scrollbar-gutter: stable;
+}
+
+.page-content,
+.page-content * {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+}
+
+.page-content .font-mono-override,
+.page-content .font-mono-override * {
+  font-family:
+    var(--font-geist-mono),
+    ui-monospace,
+    SFMono-Regular,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace !important;
+}
