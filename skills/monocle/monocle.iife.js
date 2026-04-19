@@ -221,8 +221,6 @@
       "  background: #2A2A2A; border-radius: 14px; overflow: hidden;",
       "  box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 10px 30px rgba(0,0,0,0.3); }",
       "#__monocle_panel[data-collapsed='1'] { height: auto; }",
-      "#__monocle_panel[data-collapsed='1'] #__monocle_pages,",
-      "#__monocle_panel[data-collapsed='1'] .__monocle_sep,",
       "#__monocle_panel[data-collapsed='1'] #__monocle_list { display: none; }",
       "#__monocle_head { display: flex; align-items: center; gap: 4px; padding: 8px 10px;",
       "  user-select: none; cursor: pointer; flex-shrink: 0; }",
@@ -233,17 +231,6 @@
       "  border-radius: 2px; padding: 0 6px; overflow: hidden; color: rgba(255,255,255,0.9);",
       "  font-weight: 500; font-size: 13px; line-height: 16px; text-align: center;",
       "  white-space: nowrap; text-overflow: ellipsis; flex: 1; min-width: 0; }",
-      "#__monocle_pages { display: flex; flex-direction: column; flex-shrink: 0; }",
-      "#__monocle_pages_head { display: flex; align-items: center; height: 24px;",
-      "  justify-content: space-between; margin: 8px 0 2px 0; padding-right: 12px; flex-shrink: 0; }",
-      ".__monocle_pages_label_wrap { display: flex; align-items: center; height: 100%; padding-right: 4px; }",
-      ".__monocle_pages_chev { display: flex; align-items: center; justify-content: center;",
-      "  flex-shrink: 0; height: 100%; width: 20px; }",
-      ".__monocle_pages_label { color: rgba(255,255,255,0.9); font-weight: 500;",
-      "  font-size: 12px; line-height: 16px; }",
-      ".__monocle_plus { display: flex; align-items: center; justify-content: center;",
-      "  position: relative; flex-shrink: 0; border-radius: 5px; margin: -4px; width: 24px; height: 24px; }",
-      "#__monocle_pages_list { max-height: 156px; padding-bottom: 6px; overflow: hidden; }",
       ".__monocle_row { display: flex; align-items: center; flex-shrink: 0; height: 28px;",
       "  min-width: 100%; width: -moz-fit-content; width: fit-content; word-break: keep-all;",
       "  cursor: default; }",
@@ -257,11 +244,8 @@
       "  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }",
       ".__monocle_row_trail { display: flex; align-items: center; justify-content: flex-end;",
       "  width: 45px; flex-shrink: 0; padding-right: 10px; gap: 4px; }",
-      ".__monocle_page_check { display: flex; align-items: center; justify-content: center;",
-      "  margin-right: 12px; width: 16px; flex-shrink: 0; }",
       "#__monocle_list { flex: 1; min-height: 0; overflow: auto; padding: 6px 0;",
       "  position: relative; }",
-      ".__monocle_sep { height: 1px; background: rgba(255,255,255,0.06); margin: 0; flex-shrink: 0; }",
       ".__monocle_paper_btn { display: none; background: none; border: 0; padding: 2px 6px;",
       "  cursor: pointer; color: rgba(255,255,255,0.65); border-radius: 3px; font-size: 11px;",
       "  font-family: inherit; }",
@@ -285,19 +269,6 @@
   var ICON_MONOCLE =
     '<svg width="13" height="13" viewBox="0 0 13 13" fill="rgba(255,255,255,0.5)" xmlns="http://www.w3.org/2000/svg">' +
     '<path d="M2 0V2H8V8H2V2H0V13H8V8H13V0H2Z"/></svg>';
-  var ICON_CHEVRON =
-    '<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M1 2.5L4 5.5L7 2.5"/></svg>';
-  var ICON_PLUS =
-    '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M5 0V10M0 5H10"/></svg>';
-  var ICON_PAGE =
-    '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M12.5 5.5L9.5 2.5H4.5C3.948 2.5 3.5 2.948 3.5 3.5V12.5C3.5 13.052 3.948 13.5 4.5 13.5H11.5C12.052 13.5 12.5 13.052 12.5 12.5V5.5Z" fill="rgba(255,255,255,0.11)"/>' +
-    '<path d="M12.5 5.5L9.5 2.5M12.5 5.5V12.5C12.5 13.052 12.052 13.5 11.5 13.5H4.5C3.948 13.5 3.5 13.052 3.5 12.5V3.5C3.5 2.948 3.948 2.5 4.5 2.5H9.5M12.5 5.5H9.5V2.5" stroke="rgba(255,255,255,0.9)"/></svg>';
-  var ICON_CHECK =
-    '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M1.75 5.75L4.516 8.25L8.75 1.75"/></svg>';
   var ICON_FRAME =
     '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">' +
     '<rect x="3" y="3" width="10" height="10" fill="rgba(255,255,255,0.11)"/>' +
@@ -374,55 +345,6 @@
       setCollapsed(panel.getAttribute("data-collapsed") !== "1");
     });
     panel.appendChild(head);
-
-    var pages = document.createElement("div");
-    pages.id = "__monocle_pages";
-
-    var pagesHead = document.createElement("div");
-    pagesHead.id = "__monocle_pages_head";
-    var pagesLabelWrap = document.createElement("div");
-    pagesLabelWrap.className = "__monocle_pages_label_wrap";
-    var pagesChev = document.createElement("div");
-    pagesChev.className = "__monocle_pages_chev";
-    pagesChev.innerHTML = ICON_CHEVRON;
-    var pagesLabel = document.createElement("div");
-    pagesLabel.className = "__monocle_pages_label";
-    pagesLabel.textContent = "Pages";
-    pagesLabelWrap.appendChild(pagesChev);
-    pagesLabelWrap.appendChild(pagesLabel);
-    var plus = document.createElement("div");
-    plus.className = "__monocle_plus";
-    plus.innerHTML = ICON_PLUS;
-    pagesHead.appendChild(pagesLabelWrap);
-    pagesHead.appendChild(plus);
-    pages.appendChild(pagesHead);
-
-    var pagesList = document.createElement("div");
-    pagesList.id = "__monocle_pages_list";
-    var pageRow = document.createElement("div");
-    pageRow.className = "__monocle_row";
-    var pageIndent = document.createElement("div");
-    pageIndent.className = "__monocle_indent";
-    var pageIcon = document.createElement("div");
-    pageIcon.className = "__monocle_frame_icon";
-    pageIcon.innerHTML = ICON_PAGE;
-    var pageName = document.createElement("div");
-    pageName.className = "__monocle_row_name";
-    pageName.textContent = "Page 1";
-    var pageCheck = document.createElement("div");
-    pageCheck.className = "__monocle_page_check";
-    pageCheck.innerHTML = ICON_CHECK;
-    pageRow.appendChild(pageIndent);
-    pageRow.appendChild(pageIcon);
-    pageRow.appendChild(pageName);
-    pageRow.appendChild(pageCheck);
-    pagesList.appendChild(pageRow);
-    pages.appendChild(pagesList);
-    panel.appendChild(pages);
-
-    var sep = document.createElement("div");
-    sep.className = "__monocle_sep";
-    panel.appendChild(sep);
 
     var list = document.createElement("div");
     list.id = "__monocle_list";
