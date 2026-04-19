@@ -210,6 +210,51 @@
     return out;
   }
 
+  var dragSkipClick = false;
+
+  function attachDrag(head) {
+    head.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      var rootEl = document.getElementById(ROOT_ID);
+      if (!rootEl) return;
+      var r = rootEl.getBoundingClientRect();
+      var startX = e.clientX;
+      var startY = e.clientY;
+      var baseLeft = r.left;
+      var baseTop = r.top;
+      var moved = false;
+
+      function onMove(ev) {
+        var dx = ev.clientX - startX;
+        var dy = ev.clientY - startY;
+        if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+        if (!moved) {
+          moved = true;
+          rootEl.style.right = "auto";
+          rootEl.style.bottom = "auto";
+          document.documentElement.style.cursor = "grabbing";
+        }
+        var maxX = window.innerWidth - rootEl.offsetWidth;
+        var maxY = window.innerHeight - rootEl.offsetHeight;
+        var nx = Math.max(0, Math.min(maxX, baseLeft + dx));
+        var ny = Math.max(0, Math.min(maxY, baseTop + dy));
+        rootEl.style.left = nx + "px";
+        rootEl.style.top = ny + "px";
+      }
+
+      function onUp() {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.documentElement.style.cursor = "";
+        if (moved) dragSkipClick = true;
+      }
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      e.preventDefault();
+    });
+  }
+
   function buildTree(nodes) {
     var byEl = new Map();
     nodes.forEach(function (n) {
@@ -297,7 +342,8 @@
       "#__monocle_panel[data-collapsed='1'] { height: auto; }",
       "#__monocle_panel[data-collapsed='1'] #__monocle_list { display: none; }",
       "#__monocle_head { display: flex; align-items: center; gap: 4px; padding: 8px 10px;",
-      "  user-select: none; cursor: pointer; flex-shrink: 0; }",
+      "  user-select: none; cursor: grab; flex-shrink: 0; }",
+      "#__monocle_head:active { cursor: grabbing; }",
       "#__monocle_head_icon { position: relative; display: flex; align-items: center;",
       "  justify-content: center; flex-shrink: 0; width: 28px; height: 28px;",
       "  border-radius: 5px; margin: -4px; }",
@@ -415,7 +461,12 @@
     headName.textContent = config.title || "monocle";
     head.appendChild(headIcon);
     head.appendChild(headName);
+    attachDrag(head);
     head.addEventListener("click", function () {
+      if (dragSkipClick) {
+        dragSkipClick = false;
+        return;
+      }
       setCollapsed(panel.getAttribute("data-collapsed") !== "1");
     });
     panel.appendChild(head);
