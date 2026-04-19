@@ -137,15 +137,27 @@
     if (!host) return false;
     var outer = host.querySelector('div[style*="fixed"]');
     if (!outer) return false;
+    var aligner = outer.firstElementChild;
+    var bar = aligner ? aligner.firstElementChild : null;
+    if (!bar) return false;
+
+    var prevTransform = outer.style.transform;
+    outer.style.transform = "none";
+    var barRect = bar.getBoundingClientRect();
+    outer.style.transform = prevTransform;
+    if (!barRect || barRect.width === 0 || barRect.height === 0) return false;
 
     var panelRect = panel.getBoundingClientRect();
-    var vh = window.innerHeight;
-    var panelBottomOffset = vh - panelRect.bottom;
 
-    outer.style.setProperty("bottom", (panelBottomOffset - 12) + "px", "important");
-    outer.style.setProperty("left", panelRect.left + "px", "important");
-    outer.style.setProperty("width", panelRect.width + "px", "important");
-    outer.style.setProperty("right", "auto", "important");
+    var targetCenterX = panelRect.left + panelRect.width / 2;
+    var defaultCenterX = barRect.left + barRect.width / 2;
+    var translateX = targetCenterX - defaultCenterX;
+
+    var targetBarBottom = panelRect.bottom - 12;
+    var translateY = targetBarBottom - barRect.bottom;
+
+    outer.style.transform = "translate(" + translateX + "px, " + translateY + "px)";
+    outer.style.transition = "transform 80ms ease-out";
     return true;
   }
 
