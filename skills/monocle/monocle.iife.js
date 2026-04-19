@@ -162,6 +162,7 @@
     if (!panel) return false;
     var outer = findBudgeOuter();
     if (!outer) return false;
+    outer.setAttribute("data-monocle-budge-outer", "");
     var aligner = outer.firstElementChild;
     var bar = aligner ? aligner.firstElementChild : null;
     if (!bar) return false;
@@ -472,7 +473,8 @@
       "#__monocle_ring[data-show='1'] { opacity: 1; }",
       "html[data-monocle-collapsed='1'] #__monocle_ring { display: none !important; }",
       "[data-monocle-budge-active] { opacity: 1 !important; }",
-      "[data-monocle-budge-pill] { background: #2A2A2A !important; }",
+      "[data-monocle-budge-pill] { background: #2A2A2A !important; box-shadow: none !important; }",
+      "[data-monocle-budge-outer] { z-index: 2147483647 !important; }",
     ].join("\n");
     var s = document.createElement("style");
     s.id = STYLE_ID;
