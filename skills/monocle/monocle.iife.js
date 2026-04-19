@@ -104,7 +104,7 @@
       document.body.appendChild(cfg);
       cfg.setAttribute("data-budge", payload);
       showBudgeRing();
-      scheduleBudgeIntegrate();
+      scheduleBudgeReposition();
       return;
     }
     cfg.removeAttribute("data-budge");
