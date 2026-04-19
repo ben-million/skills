@@ -346,7 +346,10 @@
     head.addEventListener("click", function () {
       var collapsed = panel.getAttribute("data-collapsed") === "1";
       panel.setAttribute("data-collapsed", collapsed ? "0" : "1");
-      if (!collapsed) clearHover();
+      if (!collapsed) {
+        clearHover();
+        closeBudge();
+      }
     });
     panel.appendChild(head);
 
@@ -576,7 +579,10 @@
       e.preventDefault();
       var collapsed = panel.getAttribute("data-collapsed") === "1";
       panel.setAttribute("data-collapsed", collapsed ? "0" : "1");
-      if (!collapsed) clearHover();
+      if (!collapsed) {
+        clearHover();
+        closeBudge();
+      }
     });
 
     document.addEventListener(
