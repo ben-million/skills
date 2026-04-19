@@ -122,11 +122,6 @@
     if (ring) ring.setAttribute("data-show", "0");
   }
 
-  function isCollapsed() {
-    var panel = document.getElementById("__monocle_panel");
-    return !!(panel && panel.getAttribute("data-collapsed") === "1");
-  }
-
   function setCollapsed(collapsed) {
     var panel = document.getElementById("__monocle_panel");
     if (!panel) return;
