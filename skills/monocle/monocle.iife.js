@@ -178,7 +178,10 @@
         break;
       }
     }
-    if (innerPill) innerPill.style.setProperty("border-radius", "0 0 14px 14px", "important");
+    if (innerPill) {
+      innerPill.style.setProperty("border-radius", "0 0 14px 14px", "important");
+      innerPill.setAttribute("data-monocle-budge-pill", "");
+    }
     forceBarActive(bar);
 
     var prevTransform = outer.style.transform;
@@ -469,6 +472,7 @@
       "#__monocle_ring[data-show='1'] { opacity: 1; }",
       "html[data-monocle-collapsed='1'] #__monocle_ring { display: none !important; }",
       "[data-monocle-budge-active] { opacity: 1 !important; }",
+      "[data-monocle-budge-pill] { background: #2A2A2A !important; }",
     ].join("\n");
     var s = document.createElement("style");
     s.id = STYLE_ID;
