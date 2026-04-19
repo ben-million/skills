@@ -102,17 +102,17 @@
       cfg.id = BUDGE_CONFIG_ID;
       cfg.hidden = true;
       document.body.appendChild(cfg);
-      cfg.setAttribute("data-budge", payload);
-      showBudgeRing();
-      scheduleBudgeReposition();
-      return;
     }
-    cfg.removeAttribute("data-budge");
-    setTimeout(function () {
-      cfg.setAttribute("data-budge", payload);
-      showBudgeRing();
-      scheduleBudgeReposition();
-    }, 0);
+    cfg.setAttribute("data-budge", payload);
+    showBudgeRing();
+    scheduleBudgeReposition();
+  }
+
+  function ensureBudgeOpen() {
+    if (document.getElementById(BUDGE_CONFIG_ID)) return;
+    var first = document.querySelector("[data-paper-node]");
+    if (!first || first.closest("#" + ROOT_ID)) return;
+    openBudgeFor(first);
   }
 
   var budgeRepositionRaf = null;
@@ -201,15 +201,6 @@
     outer.style.transform = "translate(" + translateX + "px, " + translateY + "px)";
     outer.style.transition = "none";
     return true;
-  }
-
-  function closeBudge() {
-    var cfg = document.getElementById(BUDGE_CONFIG_ID);
-    if (cfg) cfg.remove();
-    clearBudgeTarget();
-    clearBudgeIdleTimer();
-    var ring = document.getElementById("__monocle_ring");
-    if (ring) ring.setAttribute("data-show", "0");
   }
 
   function setCollapsed(collapsed) {
@@ -594,6 +585,7 @@
   function sync() {
     injectStyle();
     render(readConfig());
+    ensureBudgeOpen();
   }
 
   var scheduled = false;
@@ -691,13 +683,6 @@
           if (document.getElementById(BUDGE_CONFIG_ID)) showBudgeRing();
         }, BUDGE_IDLE_MS);
       }
-      if (
-        (e.key === "Escape" || e.key === "Enter") &&
-        document.getElementById(BUDGE_CONFIG_ID)
-      ) {
-        closeBudge();
-        return;
-      }
       if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return;
       if (e.key !== "M" && e.key !== "m") return;
       var panel = document.getElementById("__monocle_panel");
@@ -722,9 +707,6 @@
           e.stopPropagation();
           openBudgeFor(paperEl);
           return;
-        }
-        if (document.getElementById(BUDGE_CONFIG_ID)) {
-          closeBudge();
         }
       },
       true,
