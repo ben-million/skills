@@ -404,7 +404,8 @@
       "#__monocle_ring[data-show='1'] { opacity: 1; }",
       "html[data-monocle-collapsed='1'] [data-isolet='budge-widget'] { display: none !important; }",
       "html[data-monocle-collapsed='1'] #__monocle_ring { display: none !important; }",
-      "[data-isolet='budge-widget'] > div { position: absolute !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 1 !important; }",
+      "[data-isolet='budge-widget'] { position: absolute !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 10 !important; }",
+      "[data-isolet='budge-widget'] div[style*='position: fixed'] { position: static !important; bottom: auto !important; left: auto !important; right: auto !important; z-index: auto !important; }",
       "[data-isolet='budge-widget'] div[style*='inset: 0'] { background: transparent !important; box-shadow: none !important; }",
     ].join("\n");
     var s = document.createElement("style");
