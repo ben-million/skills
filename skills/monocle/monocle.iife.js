@@ -116,17 +116,41 @@
   }
 
   var budgeIntegrateRaf = null;
+  var budgeStyleObserver = null;
 
   function scheduleBudgeIntegrate() {
     if (budgeIntegrateRaf) cancelAnimationFrame(budgeIntegrateRaf);
     var tries = 0;
     function tick() {
       budgeIntegrateRaf = null;
-      if (integrateBudge()) return;
-      if (++tries > 30) return;
+      if (integrateBudge()) {
+        watchBudgeStyles();
+        return;
+      }
+      if (++tries > 60) return;
       budgeIntegrateRaf = requestAnimationFrame(tick);
     }
     budgeIntegrateRaf = requestAnimationFrame(tick);
+  }
+
+  var budgeIntegrating = false;
+
+  function watchBudgeStyles() {
+    if (budgeStyleObserver) return;
+    var host = document.querySelector('[data-isolet="budge-widget"]');
+    if (!host) return;
+    budgeStyleObserver = new MutationObserver(function () {
+      if (budgeIntegrating || budgeIntegrateRaf) return;
+      budgeIntegrateRaf = requestAnimationFrame(function () {
+        budgeIntegrateRaf = null;
+        integrateBudge();
+      });
+    });
+    budgeStyleObserver.observe(host, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
   }
 
   function integrateBudge() {
@@ -134,7 +158,37 @@
     if (!host) return false;
     var panel = document.getElementById("__monocle_panel");
     if (!panel) return false;
+    budgeIntegrating = true;
     if (host.parentElement !== panel) panel.appendChild(host);
+    host.style.setProperty("position", "absolute", "important");
+    host.style.setProperty("bottom", "0", "important");
+    host.style.setProperty("left", "0", "important");
+    host.style.setProperty("right", "0", "important");
+    host.style.setProperty("height", "68px", "important");
+    host.style.setProperty("z-index", "10", "important");
+    var wrapper = host.firstElementChild;
+    if (wrapper) {
+      wrapper.style.setProperty("position", "absolute", "important");
+      wrapper.style.setProperty("inset", "0", "important");
+      var container = wrapper.firstElementChild;
+      if (container) {
+        container.style.setProperty("position", "absolute", "important");
+        container.style.setProperty("top", "0", "important");
+        container.style.setProperty("bottom", "0", "important");
+        container.style.setProperty("left", "0", "important");
+        container.style.setProperty("right", "0", "important");
+        container.style.setProperty("z-index", "auto", "important");
+      }
+    }
+    var bar = host.querySelector('div[style*="border-radius: 9999"]');
+    if (bar) {
+      var pillBg = bar.querySelector('div[style*="inset: 0"]');
+      if (pillBg) {
+        pillBg.style.setProperty("background", "transparent", "important");
+        pillBg.style.setProperty("box-shadow", "none", "important");
+      }
+    }
+    budgeIntegrating = false;
     return true;
   }
 
@@ -143,6 +197,10 @@
     if (cfg) cfg.remove();
     clearBudgeTarget();
     clearBudgeIdleTimer();
+    if (budgeStyleObserver) {
+      budgeStyleObserver.disconnect();
+      budgeStyleObserver = null;
+    }
     var ring = document.getElementById("__monocle_ring");
     if (ring) ring.setAttribute("data-show", "0");
   }
@@ -404,9 +462,7 @@
       "#__monocle_ring[data-show='1'] { opacity: 1; }",
       "html[data-monocle-collapsed='1'] [data-isolet='budge-widget'] { display: none !important; }",
       "html[data-monocle-collapsed='1'] #__monocle_ring { display: none !important; }",
-      "[data-isolet='budge-widget'] { position: absolute !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 10 !important; }",
-      "[data-isolet='budge-widget'] div[style*='position: fixed'] { position: static !important; bottom: auto !important; left: auto !important; right: auto !important; z-index: auto !important; }",
-      "[data-isolet='budge-widget'] div[style*='inset: 0'] { background: transparent !important; box-shadow: none !important; }",
+      "#__monocle_panel [data-isolet='budge-widget'] div[style*='background'][style*='#161616'] { background: transparent !important; box-shadow: none !important; }",
     ].join("\n");
     var s = document.createElement("style");
     s.id = STYLE_ID;
